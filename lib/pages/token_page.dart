@@ -23,20 +23,12 @@ class _TokenPageState
     );
 
     if (mounted) {
-      Future<void> save() async {
-        await tokenService.saveToken(
-          controller.text.trim(),
-        );
-
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const HomePage(),
-            ),
-          );
-        }
-      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const HomePage(),
+        ),
+      );
     }
   }
 
