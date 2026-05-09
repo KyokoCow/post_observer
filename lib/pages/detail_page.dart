@@ -31,16 +31,86 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Future<void> load() async {
-    history = await analytics.history(
-      widget.articleId,
+    debugPrint("========== DETAIL LOAD START ==========");
+    debugPrint("articleId = ${widget.articleId}");
+
+    final db = await DbService.instance.database;
+
+    // ★ DB構造チェック（安全診断）
+    final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    );
+    debugPrint("TABLES = $tables");
+
+    final columns = await db.rawQuery(
+        "PRAGMA table_info(events)"
+    );
+    debugPrint("EVENTS COLUMNS = $columns");
+
+    history = await analytics.history(widget.articleId);
+
+    debugPrint("history length = ${history.length}");
+
+    final syncIds = history
+        .map((e) => e['sync_id'] as int?)
+        .whereType<int>()
+        .toSet()
+        .toList();
+
+    debugPrint("syncIds = $syncIds");
+
+    if (syncIds.isEmpty) {
+      events = [];
+      setState(() {});
+      return;
+    }
+
+    final placeholders =
+    List.filled(syncIds.length, '?').join(',');
+
+    /// ★★★ ここが完全修正ポイント（snapshot_id → sync_id）★★★
+    final result = await db.rawQuery(
+      '''
+      SELECT *
+      FROM events
+      WHERE sync_id IN ($placeholders)
+      ORDER BY timestamp ASC
+      ''',
+      syncIds,
     );
 
-    final db =
-    await DbService.instance.database;
+    events = result;
 
-    events = await db.query('events');
+    debugPrint("events length = ${events.length}");
+    debugPrint("========== DETAIL LOAD END ==========");
 
     setState(() {});
+  }
+
+  IconData _icon(String type) {
+    switch (type) {
+      case 'post':
+        return Icons.publish;
+      case 'share':
+        return Icons.share;
+      case 'update':
+        return Icons.edit;
+      default:
+        return Icons.circle;
+    }
+  }
+
+  Color _color(String type) {
+    switch (type) {
+      case 'post':
+        return Colors.blue;
+      case 'share':
+        return Colors.green;
+      case 'update':
+        return Colors.orange;
+      default:
+        return Colors.purple;
+    }
   }
 
   @override
@@ -50,11 +120,7 @@ class _DetailPageState extends State<DetailPage> {
     double maxY = 10;
 
     for (int i = 0; i < history.length; i++) {
-      final row = history[i];
-
-      final y =
-      (row['views'] as int).toDouble();
-
+      final y = (history[i]['views'] as int).toDouble();
       if (y > maxY) maxY = y;
 
       bars.add(
@@ -64,8 +130,7 @@ class _DetailPageState extends State<DetailPage> {
             BarChartRodData(
               toY: y,
               width: 18,
-              borderRadius:
-              BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(4),
             ),
           ],
         ),
@@ -74,52 +139,28 @@ class _DetailPageState extends State<DetailPage> {
 
     maxY += 20;
 
-    // ★ イベントをグラフ上に重ねる（縦線）
-    final verticalLines = <VerticalLine>[];
+    /// ★ sync_idベースでイベント→index変換
+    final eventByIndex = <int, List<Map<String, dynamic>>>{};
 
     for (final e in events) {
-      final ts = e['timestamp'].toString();
+      final syncId = e['sync_id'] as int?;
+      if (syncId == null) continue;
 
       final index = history.indexWhere(
-            (h) => h['timestamp'] == ts,
+            (h) => h['sync_id'] == syncId,
       );
 
       if (index == -1) continue;
 
-      Color color;
-
-      switch (e['type']) {
-        case 'post':
-          color = Colors.blue;
-          break;
-        case 'share':
-          color = Colors.green;
-          break;
-        case 'update':
-          color = Colors.orange;
-          break;
-        default:
-          color = Colors.purple;
-      }
-
-      verticalLines.add(
-        VerticalLine(
-          x: index.toDouble(),
-          color: color.withOpacity(0.8),
-          strokeWidth: 2,
-          dashArray: [5, 5],
-        ),
-      );
+      eventByIndex.putIfAbsent(index, () => []);
+      eventByIndex[index]!.add(e);
     }
 
-    final chartWidth = history.isEmpty
-        ? 300.0
-        : (history.length * 70.0);
+    final chartWidth =
+    history.isEmpty ? 300.0 : history.length * 70.0;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
+      appBar: AppBar(title: Text(widget.title)),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: SingleChildScrollView(
@@ -130,52 +171,67 @@ class _DetailPageState extends State<DetailPage> {
               BarChartData(
                 minY: 0,
                 maxY: maxY,
-
                 gridData: FlGridData(show: true),
                 borderData: FlBorderData(show: true),
-
-                extraLinesData: ExtraLinesData(
-                  verticalLines: verticalLines,
-                ),
 
                 titlesData: FlTitlesData(
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 40,
-                      getTitlesWidget: (value, meta) {
-                        return Text(
-                          value.toInt().toString(),
-                        );
-                      },
+                      getTitlesWidget: (value, meta) =>
+                          Text(value.toInt().toString()),
                     ),
                   ),
 
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 50,
+                      reservedSize: 70,
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
 
-                        if (index < 0 ||
-                            index >= history.length) {
+                        if (index < 0 || index >= history.length) {
                           return const SizedBox();
                         }
 
-                        final timestamp =
-                        DateTime.parse(
+                        final timestamp = DateTime.parse(
                           history[index]['timestamp'],
                         );
 
-                        return Text(
-                          '${timestamp.month}/${timestamp.day}\n'
-                              '${timestamp.hour.toString().padLeft(2, '0')}:'
-                              '${timestamp.minute.toString().padLeft(2, '0')}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 10,
-                          ),
+                        final evts = eventByIndex[index] ?? [];
+
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${timestamp.month}/${timestamp.day}\n'
+                                  '${timestamp.hour.toString().padLeft(2, '0')}:'
+                                  '${timestamp.minute.toString().padLeft(2, '0')}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 10),
+                            ),
+
+                            const SizedBox(height: 4),
+
+                            if (evts.isNotEmpty)
+                              Row(
+                                mainAxisAlignment:
+                                MainAxisAlignment.center,
+                                children: evts.map((e) {
+                                  final type = e['type'] as String;
+
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 1),
+                                    child: Icon(
+                                      _icon(type),
+                                      size: 14,
+                                      color: _color(type),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                          ],
                         );
                       },
                     ),

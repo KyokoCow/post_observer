@@ -20,26 +20,50 @@ class _HomePageState extends State<HomePage> {
 
   bool loading = false;
 
+  // ★ PV差分キャッシュ（FutureBuilder廃止）
+  Map<String, int> diffCache = {};
+
   Future<void> refresh() async {
     setState(() {
       loading = true;
     });
 
-    await syncService.sync();
+    try {
+      await syncService.sync();
 
-    articles =
-    await analytics.latestArticles();
+      articles = await analytics.latestArticles();
 
-    setState(() {
-      loading = false;
-    });
+      // ★ 差分をまとめて取得（FutureBuilder廃止）
+      diffCache.clear();
+
+      for (final a in articles) {
+        final id = a['article_id'] as String;
+
+        try {
+          diffCache[id] = await analytics.dailyIncrease(id);
+        } catch (e) {
+          diffCache[id] = 0;
+        }
+      }
+    } catch (e) {
+      debugPrint('SYNC ERROR: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('同期エラー: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
+    }
 
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text('同期完了'),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('同期完了')),
       );
     }
   }
@@ -47,7 +71,6 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-
     refresh();
   }
 
@@ -63,18 +86,19 @@ class _HomePageState extends State<HomePage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                  const SettingsPage(),
+                  builder: (_) => const SettingsPage(),
                 ),
               );
             },
           ),
         ],
       ),
+
       floatingActionButton: FloatingActionButton(
         onPressed: refresh,
         child: const Icon(Icons.sync),
       ),
+
       body: loading
           ? const Center(
         child: CircularProgressIndicator(),
@@ -84,52 +108,36 @@ class _HomePageState extends State<HomePage> {
         itemBuilder: (context, index) {
           final a = articles[index];
 
-          return FutureBuilder<int>(
-            future: analytics.dailyIncrease(
-              a['article_id'] as String,
-            ),
-            builder: (context, snapshot) {
-              final diff = snapshot.data ?? 0;
+          final id = a['article_id'] as String;
+          final diff = diffCache[id] ?? 0;
 
-              return Card(
-                child: ListTile(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => DetailPage(
-                          articleId:
-                          a['article_id'].toString(),
-                          title:
-                          a['title'].toString(),
-                        ),
-                      ),
-                    );
-                  },
-                  title: Text(
-                    a['title'].toString(),
+          return Card(
+            child: ListTile(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DetailPage(
+                      articleId: id,
+                      title: a['title'].toString(),
+                    ),
                   ),
-                  subtitle: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'PV ${a['views']} (+$diff)',
-                      ),
-                      Text(
-                        'LGTM ${a['likes']}',
-                      ),
-                      Text(
-                        'Stock ${a['stocks']}',
-                      ),
-                    ],
-                  ),
-                  trailing: const Icon(
-                    Icons.chevron_right,
-                  ),
-                ),
-              );
-            },
+                );
+              },
+
+              title: Text(a['title'].toString()),
+
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('PV ${a['views']} (+$diff)'),
+                  Text('LGTM ${a['likes']}'),
+                  Text('Stock ${a['stocks']}'),
+                ],
+              ),
+
+              trailing: const Icon(Icons.chevron_right),
+            ),
           );
         },
       ),

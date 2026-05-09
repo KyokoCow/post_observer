@@ -6,15 +6,13 @@ class SyncDataPage extends StatefulWidget {
   const SyncDataPage({super.key});
 
   @override
-  State<SyncDataPage> createState() =>
-      _SyncDataPageState();
+  State<SyncDataPage> createState() => _SyncDataPageState();
 }
 
-class _SyncDataPageState
-    extends State<SyncDataPage> {
-  List<String> timestamps = [];
+class _SyncDataPageState extends State<SyncDataPage> {
+  List<Map<String, dynamic>> snapshots = [];
 
-  Map<String, List<Map<String, dynamic>>> eventMap = {};
+  Map<int, List<Map<String, dynamic>>> eventMap = {};
 
   @override
   void initState() {
@@ -23,67 +21,65 @@ class _SyncDataPageState
   }
 
   Future<void> load() async {
-    final db =
-    await DbService.instance.database;
+    final db = await DbService.instance.database;
 
+    // ★ sync_idごとに最新1件だけ取得（正しい書き方）
     final result = await db.rawQuery('''
-      SELECT DISTINCT timestamp
+      SELECT *
       FROM snapshots
+      WHERE id IN (
+        SELECT MAX(id)
+        FROM snapshots
+        GROUP BY sync_id
+      )
       ORDER BY timestamp DESC
     ''');
 
-    final eventResult =
-    await db.query('events');
+    snapshots = result;
 
-    timestamps = result
-        .map((e) => e['timestamp'].toString())
-        .toList();
+    final eventResult = await db.query('events');
 
     eventMap.clear();
 
     for (final e in eventResult) {
-      final t = e['timestamp'].toString();
+      final syncId = e['sync_id'] as int?;
+      if (syncId == null) continue;
 
-      eventMap.putIfAbsent(t, () => []);
-
-      eventMap[t]!.add(e);
+      eventMap.putIfAbsent(syncId, () => []);
+      eventMap[syncId]!.add(e);
     }
 
     setState(() {});
   }
 
-  Future<void> deleteSync(String timestamp) async {
-    final db =
-    await DbService.instance.database;
+  Future<void> deleteSync(int syncId) async {
+    final db = await DbService.instance.database;
 
     await db.delete(
       'snapshots',
-      where: 'timestamp = ?',
-      whereArgs: [timestamp],
+      where: 'sync_id = ?',
+      whereArgs: [syncId],
     );
 
     await db.delete(
       'events',
-      where: 'timestamp = ?',
-      whereArgs: [timestamp],
+      where: 'sync_id = ?',
+      whereArgs: [syncId],
     );
 
     await load();
   }
 
-  Future<void> addEvent(
-      String timestamp,
-      String type,
-      ) async {
-    final db =
-    await DbService.instance.database;
+  Future<void> addEvent(int syncId, String type) async {
+    final db = await DbService.instance.database;
 
     await db.insert(
       'events',
       {
-        'timestamp': timestamp,
+        'sync_id': syncId,
         'type': type,
         'memo': '',
+        'timestamp': DateTime.now().toIso8601String(),
       },
     );
   }
@@ -115,10 +111,7 @@ class _SyncDataPageState
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 8,
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       margin: const EdgeInsets.only(right: 6),
       decoration: BoxDecoration(
         color: color.withOpacity(0.15),
@@ -136,7 +129,7 @@ class _SyncDataPageState
     );
   }
 
-  void _showAddEventDialog(String timestamp) {
+  void _showAddEventDialog(int syncId) {
     String type = 'post';
 
     showDialog(
@@ -146,43 +139,28 @@ class _SyncDataPageState
           builder: (context, setState) {
             return AlertDialog(
               title: const Text('イベント追加'),
-
               content: DropdownButton<String>(
                 value: type,
                 isExpanded: true,
                 items: const [
-                  DropdownMenuItem(
-                    value: 'post',
-                    child: Text('投稿'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'share',
-                    child: Text('共有'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'update',
-                    child: Text('更新'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'other',
-                    child: Text('その他'),
-                  ),
+                  DropdownMenuItem(value: 'post', child: Text('投稿')),
+                  DropdownMenuItem(value: 'share', child: Text('共有')),
+                  DropdownMenuItem(value: 'update', child: Text('更新')),
+                  DropdownMenuItem(value: 'other', child: Text('その他')),
                 ],
                 onChanged: (v) {
                   if (v == null) return;
                   setState(() => type = v);
                 },
               ),
-
               actions: [
                 TextButton(
-                  onPressed: () =>
-                      Navigator.pop(context),
+                  onPressed: () => Navigator.pop(context),
                   child: const Text('キャンセル'),
                 ),
                 TextButton(
                   onPressed: () async {
-                    await addEvent(timestamp, type);
+                    await addEvent(syncId, type);
 
                     if (context.mounted) {
                       Navigator.pop(context);
@@ -206,36 +184,32 @@ class _SyncDataPageState
         title: const Text('同期データ一覧'),
       ),
       body: ListView.builder(
-        itemCount: timestamps.length,
+        itemCount: snapshots.length,
         itemBuilder: (context, index) {
-          final timestamp = timestamps[index];
-          final events = eventMap[timestamp] ?? [];
+          final s = snapshots[index];
+          final syncId = s['sync_id'] as int;
+
+          final events = eventMap[syncId] ?? [];
 
           return Card(
             child: ListTile(
               leading: const Icon(Icons.sync),
 
               title: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(timestamp),
-
+                  Text(s['timestamp'].toString()),
                   const SizedBox(height: 4),
 
                   if (events.isEmpty)
                     const Text(
                       'イベントなし',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
                     )
                   else
                     Wrap(
                       children: events
-                          .map((e) => _tag(
-                          e['type'].toString()))
+                          .map((e) => _tag(e['type'].toString()))
                           .toList(),
                     ),
                 ],
@@ -246,35 +220,27 @@ class _SyncDataPageState
                 children: [
                   IconButton(
                     icon: const Icon(Icons.add),
-                    onPressed: () =>
-                        _showAddEventDialog(timestamp),
+                    onPressed: () => _showAddEventDialog(syncId),
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete),
                     onPressed: () async {
-                      final ok =
-                      await showDialog<bool>(
+                      final ok = await showDialog<bool>(
                         context: context,
                         builder: (_) {
                           return AlertDialog(
-                            title:
-                            const Text('削除確認'),
-                            content: const Text(
-                                'この同期データを削除しますか？'),
+                            title: const Text('削除確認'),
+                            content: const Text('この同期データを削除しますか？'),
                             actions: [
                               TextButton(
                                 onPressed: () =>
-                                    Navigator.pop(
-                                        context, false),
-                                child:
-                                const Text('キャンセル'),
+                                    Navigator.pop(context, false),
+                                child: const Text('キャンセル'),
                               ),
                               TextButton(
                                 onPressed: () =>
-                                    Navigator.pop(
-                                        context, true),
-                                child:
-                                const Text('削除'),
+                                    Navigator.pop(context, true),
+                                child: const Text('削除'),
                               ),
                             ],
                           );
@@ -282,7 +248,7 @@ class _SyncDataPageState
                       );
 
                       if (ok == true) {
-                        await deleteSync(timestamp);
+                        await deleteSync(syncId);
                       }
                     },
                   ),

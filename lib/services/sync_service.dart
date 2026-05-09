@@ -13,10 +13,14 @@ class SyncService {
 
     final now = DateTime.now().toIso8601String();
 
+    // ★ 同期単位ID（これが核）
+    final syncId = DateTime.now().millisecondsSinceEpoch;
+
     for (final item in items) {
       await db.insert(
         'snapshots',
         {
+          'sync_id': syncId, // ★必須（抜けてた原因）
           'article_id': item['id'],
           'title': item['title'],
           'views': item['page_views_count'] ?? 0,
@@ -26,5 +30,13 @@ class SyncService {
         },
       );
     }
+
+    // （任意）イベントも同一syncに紐づける場合の例
+    // await db.insert('events', {
+    //   'sync_id': syncId,
+    //   'type': 'sync',
+    //   'memo': 'auto sync',
+    //   'timestamp': now,
+    // });
   }
 }

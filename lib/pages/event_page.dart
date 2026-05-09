@@ -51,11 +51,12 @@ class _EventPageState
       appBar: AppBar(
         title: const Text('イベントログ'),
       ),
-
       body: ListView.builder(
         itemCount: events.length,
         itemBuilder: (context, index) {
           final e = events[index];
+
+          final syncId = e['sync_id'];
 
           return Card(
             child: ListTile(
@@ -68,8 +69,17 @@ class _EventPageState
                 CrossAxisAlignment.start,
                 children: [
                   Text(
+                    'sync_id: $syncId',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+
+                  Text(
                     e['timestamp'].toString(),
                   ),
+
                   if ((e['memo'] ?? '')
                       .toString()
                       .isNotEmpty)
