@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../services/analytics_service.dart';
+import '../services/db_service.dart';
 
 class DetailPage extends StatefulWidget {
   final String articleId;
@@ -21,11 +22,11 @@ class _DetailPageState extends State<DetailPage> {
   final analytics = AnalyticsService();
 
   List<Map<String, dynamic>> history = [];
+  List<Map<String, dynamic>> events = [];
 
   @override
   void initState() {
     super.initState();
-
     load();
   }
 
@@ -33,6 +34,11 @@ class _DetailPageState extends State<DetailPage> {
     history = await analytics.history(
       widget.articleId,
     );
+
+    final db =
+    await DbService.instance.database;
+
+    events = await db.query('events');
 
     setState(() {});
   }
@@ -49,9 +55,7 @@ class _DetailPageState extends State<DetailPage> {
       final y =
       (row['views'] as int).toDouble();
 
-      if (y > maxY) {
-        maxY = y;
-      }
+      if (y > maxY) maxY = y;
 
       bars.add(
         BarChartGroupData(
@@ -70,6 +74,48 @@ class _DetailPageState extends State<DetailPage> {
 
     maxY += 20;
 
+    // ★ イベントをグラフ上に重ねる（縦線）
+    final verticalLines = <VerticalLine>[];
+
+    for (final e in events) {
+      final ts = e['timestamp'].toString();
+
+      final index = history.indexWhere(
+            (h) => h['timestamp'] == ts,
+      );
+
+      if (index == -1) continue;
+
+      Color color;
+
+      switch (e['type']) {
+        case 'post':
+          color = Colors.blue;
+          break;
+        case 'share':
+          color = Colors.green;
+          break;
+        case 'update':
+          color = Colors.orange;
+          break;
+        default:
+          color = Colors.purple;
+      }
+
+      verticalLines.add(
+        VerticalLine(
+          x: index.toDouble(),
+          color: color.withOpacity(0.8),
+          strokeWidth: 2,
+          dashArray: [5, 5],
+        ),
+      );
+    }
+
+    final chartWidth = history.isEmpty
+        ? 300.0
+        : (history.length * 70.0);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
@@ -79,18 +125,17 @@ class _DetailPageState extends State<DetailPage> {
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: SizedBox(
-            width: history.length * 70,
+            width: chartWidth,
             child: BarChart(
               BarChartData(
                 minY: 0,
                 maxY: maxY,
 
-                gridData: FlGridData(
-                  show: true,
-                ),
+                gridData: FlGridData(show: true),
+                borderData: FlBorderData(show: true),
 
-                borderData: FlBorderData(
-                  show: true,
+                extraLinesData: ExtraLinesData(
+                  verticalLines: verticalLines,
                 ),
 
                 titlesData: FlTitlesData(
@@ -98,12 +143,9 @@ class _DetailPageState extends State<DetailPage> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 40,
-                      getTitlesWidget:
-                          (value, meta) {
+                      getTitlesWidget: (value, meta) {
                         return Text(
-                          value
-                              .toInt()
-                              .toString(),
+                          value.toInt().toString(),
                         );
                       },
                     ),
@@ -113,38 +155,26 @@ class _DetailPageState extends State<DetailPage> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 50,
-                      getTitlesWidget:
-                          (value, meta) {
-                        final index =
-                        value.toInt();
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
 
                         if (index < 0 ||
-                            index >=
-                                history.length) {
+                            index >= history.length) {
                           return const SizedBox();
                         }
 
                         final timestamp =
                         DateTime.parse(
-                          history[index]
-                          ['timestamp'],
+                          history[index]['timestamp'],
                         );
 
-                        return Padding(
-                          padding:
-                          const EdgeInsets.only(
-                            top: 8,
-                          ),
-                          child: Text(
-                            '${timestamp.month}/${timestamp.day}\n'
-                                '${timestamp.hour.toString().padLeft(2, '0')}:'
-                                '${timestamp.minute.toString().padLeft(2, '0')}',
-                            textAlign:
-                            TextAlign.center,
-                            style:
-                            const TextStyle(
-                              fontSize: 10,
-                            ),
+                        return Text(
+                          '${timestamp.month}/${timestamp.day}\n'
+                              '${timestamp.hour.toString().padLeft(2, '0')}:'
+                              '${timestamp.minute.toString().padLeft(2, '0')}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 10,
                           ),
                         );
                       },
