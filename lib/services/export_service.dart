@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:csv/csv.dart';
 import 'package:path/path.dart';
-import 'package:share_plus/share_plus.dart';
 
 import 'db_service.dart';
 
@@ -11,6 +10,45 @@ class ExportService {
     final db =
     await DbService.instance.database;
 
+    final now = DateTime.now();
+
+    final timestamp =
+        '${now.year}'
+        '${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}_'
+        '${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}'
+        '${now.second.toString().padLeft(2, '0')}';
+
+    final dir =
+    Directory(
+      '/storage/emulated/0/Download',
+    );
+
+    if (!await dir.exists()) {
+      await dir.create(
+        recursive: true,
+      );
+    }
+
+    await _exportSnapshots(
+      db,
+      dir.path,
+      timestamp,
+    );
+
+    await _exportEvents(
+      db,
+      dir.path,
+      timestamp,
+    );
+  }
+
+  Future<void> _exportSnapshots(
+      dynamic db,
+      String dirPath,
+      String timestamp,
+      ) async {
     final rows = await db.query(
       'snapshots',
       orderBy: 'timestamp ASC',
@@ -42,30 +80,9 @@ class ExportService {
     const ListToCsvConverter()
         .convert(data);
 
-    final now = DateTime.now();
-
-    final fileName =
-        'qiita_export_'
-        '${now.year}'
-        '${now.month.toString().padLeft(2, '0')}'
-        '${now.day.toString().padLeft(2, '0')}_'
-        '${now.hour.toString().padLeft(2, '0')}'
-        '${now.minute.toString().padLeft(2, '0')}'
-        '${now.second.toString().padLeft(2, '0')}.csv';
-
-    // Android Downloads
-    final dir =
-    Directory('/storage/emulated/0/Download');
-
-    if (!await dir.exists()) {
-      await dir.create(
-        recursive: true,
-      );
-    }
-
     final path = join(
-      dir.path,
-      fileName,
+      dirPath,
+      'snapshots_$timestamp.csv',
     );
 
     final file = File(path);
@@ -73,9 +90,47 @@ class ExportService {
     await file.writeAsString(
       '\uFEFF$csv',
     );
+  }
 
-    await Share.shareXFiles([
-      XFile(path),
+  Future<void> _exportEvents(
+      dynamic db,
+      String dirPath,
+      String timestamp,
+      ) async {
+    final rows = await db.query(
+      'events',
+      orderBy: 'timestamp ASC',
+    );
+
+    final data = <List<dynamic>>[];
+
+    data.add([
+      'timestamp',
+      'type',
+      'memo',
     ]);
+
+    for (final row in rows) {
+      data.add([
+        row['timestamp'],
+        row['type'],
+        row['memo'],
+      ]);
+    }
+
+    final csv =
+    const ListToCsvConverter()
+        .convert(data);
+
+    final path = join(
+      dirPath,
+      'events_$timestamp.csv',
+    );
+
+    final file = File(path);
+
+    await file.writeAsString(
+      '\uFEFF$csv',
+    );
   }
 }

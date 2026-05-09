@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'sync_data_page.dart';
 import '../services/export_service.dart';
+import 'event_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -15,6 +16,22 @@ class SettingsPage extends StatelessWidget {
       ),
       body: ListView(
         children: [
+          ListTile(
+            leading: const Icon(Icons.event),
+            title: const Text('投稿イベント'),
+            trailing:
+            const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                  const EventPage(),
+                ),
+              );
+            },
+          ),
+
           ListTile(
             leading: const Icon(Icons.storage),
             title: const Text('同期データ一覧'),
