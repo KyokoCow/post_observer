@@ -12,7 +12,7 @@ class SyncDataPage extends StatefulWidget {
 
 class _SyncDataPageState
     extends State<SyncDataPage> {
-  List<Map<String, dynamic>> rows = [];
+  List<String> timestamps = [];
 
   @override
   void initState() {
@@ -25,22 +25,32 @@ class _SyncDataPageState
     final db =
     await DbService.instance.database;
 
-    rows = await db.query(
-      'snapshots',
-      orderBy: 'timestamp DESC',
-    );
+    final result = await db.rawQuery('''
+      SELECT DISTINCT timestamp
+      FROM snapshots
+      ORDER BY timestamp DESC
+    ''');
+
+    timestamps = result
+        .map(
+          (e) =>
+          e['timestamp'].toString(),
+    )
+        .toList();
 
     setState(() {});
   }
 
-  Future<void> deleteRow(int id) async {
+  Future<void> deleteSync(
+      String timestamp,
+      ) async {
     final db =
     await DbService.instance.database;
 
     await db.delete(
       'snapshots',
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'timestamp = ?',
+      whereArgs: [timestamp],
     );
 
     await load();
@@ -53,36 +63,21 @@ class _SyncDataPageState
         title:
         const Text('同期データ一覧'),
       ),
+
       body: ListView.builder(
-        itemCount: rows.length,
+        itemCount: timestamps.length,
+
         itemBuilder: (context, index) {
-          final row = rows[index];
+          final timestamp =
+          timestamps[index];
 
           return Card(
             child: ListTile(
-              title: Text(
-                row['title']
-                    ?.toString() ??
-                    '',
+              leading: const Icon(
+                Icons.sync,
               ),
 
-              subtitle: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment
-                    .start,
-                children: [
-                  Text(
-                    row['timestamp']
-                        .toString(),
-                  ),
-
-                  Text(
-                    'PV ${row['views']}  '
-                        'LGTM ${row['likes']}  '
-                        'Stock ${row['stocks']}',
-                  ),
-                ],
-              ),
+              title: Text(timestamp),
 
               trailing: IconButton(
                 icon: const Icon(
@@ -93,6 +88,7 @@ class _SyncDataPageState
                   final ok =
                   await showDialog<bool>(
                     context: context,
+
                     builder: (_) {
                       return AlertDialog(
                         title: const Text(
@@ -101,7 +97,7 @@ class _SyncDataPageState
 
                         content:
                         const Text(
-                          'このデータを削除しますか？',
+                          'この同期データを削除しますか？',
                         ),
 
                         actions: [
@@ -138,8 +134,8 @@ class _SyncDataPageState
                   );
 
                   if (ok == true) {
-                    await deleteRow(
-                      row['id'] as int,
+                    await deleteSync(
+                      timestamp,
                     );
                   }
                 },
