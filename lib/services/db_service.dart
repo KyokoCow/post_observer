@@ -22,7 +22,7 @@ class DbService {
 
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
 
       onCreate: (db, version) async {
         await _createAll(db);
@@ -50,6 +50,11 @@ class DbService {
         views INTEGER NOT NULL,
         likes INTEGER NOT NULL,
         stocks INTEGER NOT NULL,
+        
+        comments INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT,
+        updated_at TEXT,
+        
         timestamp TEXT NOT NULL
       )
     ''');
@@ -61,6 +66,29 @@ class DbService {
         type TEXT NOT NULL,
         memo TEXT,
         timestamp TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE sync_sessions(
+        sync_id INTEGER PRIMARY KEY,
+
+        timestamp TEXT NOT NULL,
+
+        total_articles INTEGER NOT NULL DEFAULT 0,
+        total_views INTEGER NOT NULL DEFAULT 0,
+        total_likes INTEGER NOT NULL DEFAULT 0,
+        total_stocks INTEGER NOT NULL DEFAULT 0,
+        followers INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE tags(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sync_id INTEGER NOT NULL,
+        article_id TEXT NOT NULL,
+        tag TEXT NOT NULL
       )
     ''');
   }

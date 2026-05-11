@@ -7,12 +7,13 @@ import 'token_service.dart';
 class QiitaService {
   final tokenService = TokenService();
 
+  /// =========================
+  /// 記事一覧取得
+  /// =========================
   Future<List<dynamic>> fetchItems() async {
-    final token =
-    await tokenService.loadToken();
+    final token = await tokenService.loadToken();
 
-    if (token == null ||
-        token.isEmpty) {
+    if (token == null || token.isEmpty) {
       throw Exception('Token未設定');
     }
 
@@ -26,9 +27,51 @@ class QiitaService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Qiita API error');
+      throw Exception(
+        'Qiita API error: ${response.statusCode}',
+      );
     }
 
-    return jsonDecode(response.body);
+    final data = jsonDecode(response.body);
+
+    if (data is! List) {
+      throw Exception('Unexpected response format');
+    }
+
+    return data;
+  }
+
+  /// =========================
+  /// ユーザー情報取得
+  /// =========================
+  Future<Map<String, dynamic>> fetchUser() async {
+    final token = await tokenService.loadToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Token未設定');
+    }
+
+    final response = await http.get(
+      Uri.parse(
+        'https://qiita.com/api/v2/authenticated_user',
+      ),
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Qiita User API error: ${response.statusCode}',
+      );
+    }
+
+    final data = jsonDecode(response.body);
+
+    if (data is! Map<String, dynamic>) {
+      throw Exception('Unexpected user response format');
+    }
+
+    return data;
   }
 }
