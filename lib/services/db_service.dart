@@ -25,7 +25,7 @@ class DbService {
 
     return openDatabase(
       path,
-      version: 6,
+      version: 7,
 
       onCreate: (db, version) async {
         await _createAll(db);
@@ -99,7 +99,8 @@ class DbService {
     await db.execute('''
       CREATE TABLE events(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        sync_id INTEGER NOT NULL,
+        sync_id INTEGER,
+        article_id TEXT,
         type TEXT NOT NULL,
         memo TEXT,
         timestamp TEXT NOT NULL
