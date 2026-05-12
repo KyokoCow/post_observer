@@ -23,6 +23,7 @@ class _HomePageState extends State<HomePage> {
 
   // ★ PV差分キャッシュ（FutureBuilder廃止）
   Map<String, int> diffCache = {};
+  Map<String, List<String>> tagCache = {};
 
   Future<void> refresh() async {
     setState(() {
@@ -37,12 +38,15 @@ class _HomePageState extends State<HomePage> {
 
       // ★ 差分をまとめて取得（FutureBuilder廃止）
       diffCache.clear();
+      tagCache.clear();
 
       for (final a in articles) {
         final id = a['article_id'] as String;
 
         try {
           diffCache[id] = await analytics.dailyIncrease(id);
+          tagCache[id] =
+          await analytics.tags(id);
         } catch (e) {
           diffCache[id] = 0;
         }
@@ -185,6 +189,9 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
                   children: [
+
+                    const SizedBox(height: 4),
+
                     Text(
                       'PV ${a['views']} (+$diff)',
                     ),
@@ -195,6 +202,49 @@ class _HomePageState extends State<HomePage> {
 
                     Text(
                       'Stock ${a['stocks']}',
+                    ),
+
+                    Text(
+                      'Comments ${a['comments']}',
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    Text(
+                      'Created: ${a['created_at']}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+
+                    Text(
+                      'Updated: ${a['updated_at']}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children:
+                      (tagCache[id] ?? []).map((tag) {
+                        return Chip(
+                          label: Text(
+                            tag,
+                            style: const TextStyle(
+                              fontSize: 10,
+                            ),
+                          ),
+
+                          visualDensity:
+                          VisualDensity.compact,
+                        );
+                      }).toList(),
                     ),
                   ],
                 ),

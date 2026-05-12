@@ -6,17 +6,25 @@ class AnalyticsService {
   Future<List<Map<String, dynamic>>> latestArticles() async {
     final db = await DbService.instance.database;
 
-    final result = await db.rawQuery('''
-    SELECT *
-    FROM snapshots s1
-    WHERE timestamp = (
-      SELECT MAX(timestamp)
-      FROM snapshots s2
-      WHERE s1.article_id = s2.article_id
-    )
-    ''');
+    final latestSession = await db.query(
+      'sync_sessions',
+      orderBy: 'timestamp DESC',
+      limit: 1,
+    );
 
-    return result;
+    if (latestSession.isEmpty) {
+      return [];
+    }
+
+    final syncId =
+    latestSession.first['sync_id'];
+
+    return db.query(
+      'snapshots',
+      where: 'sync_id = ?',
+      whereArgs: [syncId],
+      orderBy: 'views DESC',
+    );
   }
 
   Future<int> dailyIncrease(String articleId) async {
@@ -65,5 +73,42 @@ class AnalyticsService {
     }
 
     return result.first;
+  }
+  Future<List<String>> tags(
+      String articleId,
+      ) async {
+
+    final db =
+    await DbService.instance.database;
+
+    final latest = await db.query(
+      'snapshots',
+      where: 'article_id = ?',
+      whereArgs: [articleId],
+      orderBy: 'timestamp DESC',
+      limit: 1,
+    );
+
+    if (latest.isEmpty) {
+      return [];
+    }
+
+    final syncId =
+    latest.first['sync_id'];
+
+    final result = await db.query(
+      'tags',
+      where:
+      'article_id = ? AND sync_id = ?',
+      whereArgs: [
+        articleId,
+        syncId,
+      ],
+    );
+
+    return result
+        .map((e) => e['tag'].toString())
+        .toSet()
+        .toList();
   }
 }
