@@ -19,14 +19,48 @@ class ExportService {
         '${now.minute.toString().padLeft(2, '0')}'
         '${now.second.toString().padLeft(2, '0')}';
 
-    final dir = Directory('/storage/emulated/0/Download');
+    final baseDir =
+    Directory(
+      '/storage/emulated/0/Download',
+    );
 
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
+    if (!await baseDir.exists()) {
+      await baseDir.create(
+        recursive: true,
+      );
     }
 
-    await _exportSnapshots(db, dir.path, timestamp);
-    await _exportEvents(db, dir.path, timestamp);
+    /// ★ export専用フォルダ
+    final exportDir = Directory(
+      join(
+        baseDir.path,
+        'qiita_observer_$timestamp',
+      ),
+    );
+
+    await exportDir.create(
+      recursive: true,
+    );
+
+    if (!await baseDir.exists()) {
+      await baseDir.create(
+        recursive: true,
+      );
+    }
+
+    await _exportSnapshots(db, exportDir.path, timestamp);
+    await _exportEvents(db, exportDir.path, timestamp);
+    await _exportTags(
+      db,
+      exportDir.path,
+      timestamp,
+    );
+
+    await _exportSyncSessions(
+      db,
+      exportDir.path,
+      timestamp,
+    );
   }
 
   Future<void> _exportSnapshots(
@@ -48,6 +82,9 @@ class ExportService {
       'views',
       'likes',
       'stocks',
+      'comments',
+      'created_at',
+      'updated_at',
       'timestamp',
     ]);
 
@@ -59,13 +96,16 @@ class ExportService {
         row['views'],
         row['likes'],
         row['stocks'],
+        row['comments'],
+        row['created_at'],
+        row['updated_at'],
         row['timestamp'],
       ]);
     }
 
     final csv = const ListToCsvConverter().convert(data);
 
-    final file = File(join(dirPath, 'snapshots_$timestamp.csv'));
+    final file = File(join(dirPath, 'snapshots.csv'));
 
     await file.writeAsString('\uFEFF$csv');
   }
@@ -98,10 +138,95 @@ class ExportService {
       ]);
     }
 
+
+
     final csv = const ListToCsvConverter().convert(data);
 
-    final file = File(join(dirPath, 'events_$timestamp.csv'));
+    final file = File(join(dirPath, 'events.csv'));
 
     await file.writeAsString('\uFEFF$csv');
+  }
+
+  Future<void> _exportTags(
+      dynamic db,
+      String dirPath,
+      String timestamp,
+      ) async {
+    final rows = await db.query('tags');
+
+    final data = <List<dynamic>>[];
+
+    data.add([
+      'sync_id',
+      'article_id',
+      'tag',
+    ]);
+
+    for (final row in rows) {
+      data.add([
+        row['sync_id'],
+        row['article_id'],
+        row['tag'],
+      ]);
+    }
+
+    final csv =
+    const ListToCsvConverter()
+        .convert(data);
+
+    final path = join(
+      dirPath,
+      'tags.csv',
+    );
+
+    await File(path).writeAsString(
+      '\uFEFF$csv',
+    );
+  }
+
+  Future<void> _exportSyncSessions(
+      dynamic db,
+      String dirPath,
+      String timestamp,
+      ) async {
+    final rows =
+    await db.query('sync_sessions');
+
+    final data = <List<dynamic>>[];
+
+    data.add([
+      'sync_id',
+      'timestamp',
+      'total_articles',
+      'total_views',
+      'total_likes',
+      'total_stocks',
+      'followers',
+    ]);
+
+    for (final row in rows) {
+      data.add([
+        row['sync_id'],
+        row['timestamp'],
+        row['total_articles'],
+        row['total_views'],
+        row['total_likes'],
+        row['total_stocks'],
+        row['followers'],
+      ]);
+    }
+
+    final csv =
+    const ListToCsvConverter()
+        .convert(data);
+
+    final path = join(
+      dirPath,
+      'sync_sessions.csv',
+    );
+
+    await File(path).writeAsString(
+      '\uFEFF$csv',
+    );
   }
 }

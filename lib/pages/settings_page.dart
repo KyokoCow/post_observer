@@ -128,8 +128,7 @@ class SettingsPage extends StatelessWidget {
                 return;
               }
 
-              await importService
-                  .importSnapshots();
+              await importService.importAll();
 
               if (context.mounted) {
                 ScaffoldMessenger.of(context)
@@ -199,8 +198,7 @@ class SettingsPage extends StatelessWidget {
                 return;
               }
 
-              await importService
-                  .importEvents();
+              await importService.importAll();
 
               if (context.mounted) {
                 ScaffoldMessenger.of(context)
