@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart';
@@ -15,6 +16,7 @@ class ImportService {
   final Map<int, int> _syncIdMap = {};
 
   int _remapSyncId(int oldId) {
+
     return _syncIdMap.putIfAbsent(
       oldId,
           () =>
@@ -29,33 +31,88 @@ class ImportService {
 
   Future<void> importAll() async {
 
-    final path =
-    await FilePicker.platform
-        .getDirectoryPath();
+    /// zip選択
 
-    if (path == null) {
+    final result =
+    await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['zip'],
+    );
+
+    if (result == null) {
       return;
     }
 
+    final zipPath =
+        result.files.single.path;
+
+    if (zipPath == null) {
+      return;
+    }
+
+    /// =========================
+    /// temp展開
+    /// =========================
+
+    final tempDir =
+    await Directory.systemTemp
+        .createTemp();
+
+    extractFileToDisk(
+      zipPath,
+      tempDir.path,
+    );
+
+    /// =========================
+    /// exportDir検出
+    /// =========================
+
+    final dirs = tempDir
+        .listSync()
+        .whereType<Directory>()
+        .toList();
+
+    if (dirs.isEmpty) {
+
+      throw Exception(
+        'zip内フォルダが見つかりません',
+      );
+    }
+
+    final rootDir = dirs.first;
+
     final snapshotsFile = File(
-      join(path, 'snapshots.csv'),
+      join(
+        rootDir.path,
+        'snapshots.csv',
+      ),
     );
 
     final eventsFile = File(
-      join(path, 'events.csv'),
+      join(
+        rootDir.path,
+        'events.csv',
+      ),
     );
 
     final tagsFile = File(
-      join(path, 'tags.csv'),
+      join(
+        rootDir.path,
+        'tags.csv',
+      ),
     );
 
     final sessionsFile = File(
-      join(path, 'sync_sessions.csv'),
+      join(
+        rootDir.path,
+        'sync_sessions.csv',
+      ),
     );
 
     /// snapshots は必須
 
     if (!await snapshotsFile.exists()) {
+
       throw Exception(
         'snapshots.csv が見つかりません',
       );
@@ -92,6 +149,7 @@ class ImportService {
     );
 
     if (hasEvents) {
+
       await importEvents(
         db,
         eventsFile,
@@ -99,6 +157,7 @@ class ImportService {
     }
 
     if (hasTags) {
+
       await importTags(
         db,
         tagsFile,
@@ -106,11 +165,20 @@ class ImportService {
     }
 
     if (hasSessions) {
+
       await importSyncSessions(
         db,
         sessionsFile,
       );
     }
+
+    /// =========================
+    /// temp削除
+    /// =========================
+
+    await tempDir.delete(
+      recursive: true,
+    );
   }
 
   /// =========================

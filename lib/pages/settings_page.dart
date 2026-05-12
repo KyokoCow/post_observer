@@ -53,7 +53,7 @@ class SettingsPage extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.upload),
             title:
-            const Text('CSVエクスポート'),
+            const Text('バックアップ作成'),
 
 
             onTap: () async {
@@ -64,7 +64,7 @@ class SettingsPage extends StatelessWidget {
                     .showSnackBar(
                   const SnackBar(
                     content: Text(
-                      'CSVエクスポート完了',
+                      'バックアップ作成完了',
                     ),
                   ),
                 );
@@ -75,7 +75,7 @@ class SettingsPage extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.download),
             title:
-            const Text('同期データ復元'),
+            const Text('バックアップ復元'),
 
             onTap: () async {
               final ok =
@@ -89,8 +89,7 @@ class SettingsPage extends StatelessWidget {
                     ),
 
                     content: const Text(
-                      '現在のスナップショットを\n'
-                          '削除して復元しますか？',
+                      '現在のデータを削除して復元しますか？',
                     ),
 
                     actions: [
@@ -135,83 +134,14 @@ class SettingsPage extends StatelessWidget {
                     .showSnackBar(
                   const SnackBar(
                     content: Text(
-                      'スナップショット復元完了',
+                      'バックアップ復元完了',
                     ),
                   ),
                 );
               }
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.download),
-            title:
-            const Text('イベント復元'),
 
-            onTap: () async {
-              final ok =
-              await showDialog<bool>(
-                context: context,
-
-                builder: (_) {
-                  return AlertDialog(
-                    title: const Text(
-                      '復元確認',
-                    ),
-
-                    content: const Text(
-                      '現在のイベントを\n'
-                          '削除して復元しますか？',
-                    ),
-
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(
-                            context,
-                            false,
-                          );
-                        },
-
-                        child: const Text(
-                          'キャンセル',
-                        ),
-                      ),
-
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(
-                            context,
-                            true,
-                          );
-                        },
-
-                        child: const Text(
-                          '実行',
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              );
-
-              if (ok != true) {
-                return;
-              }
-
-              await importService.importAll();
-
-              if (context.mounted) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'イベント復元完了',
-                    ),
-                  ),
-                );
-              }
-            },
-          ),
         ],
       ),
     );

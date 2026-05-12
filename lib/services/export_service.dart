@@ -1,13 +1,17 @@
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:csv/csv.dart';
 import 'package:path/path.dart';
 
 import 'db_service.dart';
 
 class ExportService {
+
   Future<void> exportCsv() async {
-    final db = await DbService.instance.database;
+
+    final db =
+    await DbService.instance.database;
 
     final now = DateTime.now();
 
@@ -19,8 +23,11 @@ class ExportService {
         '${now.minute.toString().padLeft(2, '0')}'
         '${now.second.toString().padLeft(2, '0')}';
 
-    final baseDir =
-    Directory(
+    /// =========================
+    /// 保存先
+    /// =========================
+
+    final baseDir = Directory(
       '/storage/emulated/0/Download',
     );
 
@@ -30,11 +37,14 @@ class ExportService {
       );
     }
 
-    /// ★ export専用フォルダ
+    /// =========================
+    /// 一時フォルダ
+    /// =========================
+
     final exportDir = Directory(
       join(
         baseDir.path,
-        'qiita_observer_$timestamp',
+        'qiita_observer_temp_$timestamp',
       ),
     );
 
@@ -42,32 +52,66 @@ class ExportService {
       recursive: true,
     );
 
-    if (!await baseDir.exists()) {
-      await baseDir.create(
-        recursive: true,
-      );
-    }
+    /// =========================
+    /// CSV生成
+    /// =========================
 
-    await _exportSnapshots(db, exportDir.path, timestamp);
-    await _exportEvents(db, exportDir.path, timestamp);
+    await _exportSnapshots(
+      db,
+      exportDir.path,
+    );
+
+    await _exportEvents(
+      db,
+      exportDir.path,
+    );
+
     await _exportTags(
       db,
       exportDir.path,
-      timestamp,
     );
 
     await _exportSyncSessions(
       db,
       exportDir.path,
-      timestamp,
+    );
+
+    /// =========================
+    /// zip化
+    /// =========================
+
+    final zipPath = join(
+      baseDir.path,
+      'qiita_observer_$timestamp.zip',
+    );
+
+    final encoder =
+    ZipFileEncoder();
+
+    encoder.create(zipPath);
+
+    encoder.addDirectory(exportDir);
+
+    encoder.close();
+
+    /// =========================
+    /// temp削除
+    /// =========================
+
+    await exportDir.delete(
+      recursive: true,
     );
   }
+
+  /// =========================
+  /// snapshots
+  /// =========================
 
   Future<void> _exportSnapshots(
       dynamic db,
       String dirPath,
-      String timestamp,
       ) async {
+
     final rows = await db.query(
       'snapshots',
       orderBy: 'timestamp ASC',
@@ -89,6 +133,7 @@ class ExportService {
     ]);
 
     for (final row in rows) {
+
       data.add([
         row['sync_id'],
         row['article_id'],
@@ -103,18 +148,31 @@ class ExportService {
       ]);
     }
 
-    final csv = const ListToCsvConverter().convert(data);
+    final csv =
+    const ListToCsvConverter()
+        .convert(data);
 
-    final file = File(join(dirPath, 'snapshots.csv'));
+    final file = File(
+      join(
+        dirPath,
+        'snapshots.csv',
+      ),
+    );
 
-    await file.writeAsString('\uFEFF$csv');
+    await file.writeAsString(
+      '\uFEFF$csv',
+    );
   }
+
+  /// =========================
+  /// events
+  /// =========================
 
   Future<void> _exportEvents(
       dynamic db,
       String dirPath,
-      String timestamp,
       ) async {
+
     final rows = await db.query(
       'events',
       orderBy: 'timestamp ASC',
@@ -130,6 +188,7 @@ class ExportService {
     ]);
 
     for (final row in rows) {
+
       data.add([
         row['sync_id'],
         row['type'],
@@ -138,23 +197,36 @@ class ExportService {
       ]);
     }
 
+    final csv =
+    const ListToCsvConverter()
+        .convert(data);
 
+    final file = File(
+      join(
+        dirPath,
+        'events.csv',
+      ),
+    );
 
-    final csv = const ListToCsvConverter().convert(data);
-
-    final file = File(join(dirPath, 'events.csv'));
-
-    await file.writeAsString('\uFEFF$csv');
+    await file.writeAsString(
+      '\uFEFF$csv',
+    );
   }
+
+  /// =========================
+  /// tags
+  /// =========================
 
   Future<void> _exportTags(
       dynamic db,
       String dirPath,
-      String timestamp,
       ) async {
-    final rows = await db.query('tags');
 
-    final data = <List<dynamic>>[];
+    final rows =
+    await db.query('tags');
+
+    final data =
+    <List<dynamic>>[];
 
     data.add([
       'sync_id',
@@ -163,6 +235,7 @@ class ExportService {
     ]);
 
     for (final row in rows) {
+
       data.add([
         row['sync_id'],
         row['article_id'],
@@ -174,25 +247,34 @@ class ExportService {
     const ListToCsvConverter()
         .convert(data);
 
-    final path = join(
-      dirPath,
-      'tags.csv',
+    final file = File(
+      join(
+        dirPath,
+        'tags.csv',
+      ),
     );
 
-    await File(path).writeAsString(
+    await file.writeAsString(
       '\uFEFF$csv',
     );
   }
 
+  /// =========================
+  /// sync_sessions
+  /// =========================
+
   Future<void> _exportSyncSessions(
       dynamic db,
       String dirPath,
-      String timestamp,
       ) async {
-    final rows =
-    await db.query('sync_sessions');
 
-    final data = <List<dynamic>>[];
+    final rows =
+    await db.query(
+      'sync_sessions',
+    );
+
+    final data =
+    <List<dynamic>>[];
 
     data.add([
       'sync_id',
@@ -205,6 +287,7 @@ class ExportService {
     ]);
 
     for (final row in rows) {
+
       data.add([
         row['sync_id'],
         row['timestamp'],
@@ -220,12 +303,14 @@ class ExportService {
     const ListToCsvConverter()
         .convert(data);
 
-    final path = join(
-      dirPath,
-      'sync_sessions.csv',
+    final file = File(
+      join(
+        dirPath,
+        'sync_sessions.csv',
+      ),
     );
 
-    await File(path).writeAsString(
+    await file.writeAsString(
       '\uFEFF$csv',
     );
   }
