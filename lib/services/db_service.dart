@@ -1,5 +1,8 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import '../models/article.dart';
+import '../models/article_snapshot.dart';
+import '../models/event.dart';
 
 class DbService {
   static final DbService instance = DbService._();
@@ -22,21 +25,55 @@ class DbService {
 
     return openDatabase(
       path,
-      version: 4,
+      version: 6,
 
       onCreate: (db, version) async {
         await _createAll(db);
       },
 
-      onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 3) {
-          // ★開発用フルリセット（現状維持でOKだが将来注意）
-          await db.execute('DROP TABLE IF EXISTS snapshots');
-          await db.execute('DROP TABLE IF EXISTS events');
+        onUpgrade: (db, oldVersion, newVersion) async {
 
-          await _createAll(db);
-        }
-      },
+          if (oldVersion < 3) {
+            // 開発用リセット
+            await db.execute(
+              'DROP TABLE IF EXISTS snapshots',
+            );
+
+            await db.execute(
+              'DROP TABLE IF EXISTS events',
+            );
+
+            await _createAll(db);
+          }
+
+          if (oldVersion < 5) {
+
+            await db.execute('''
+      CREATE TABLE articles(
+        article_id TEXT PRIMARY KEY,
+        
+        title TEXT NOT NULL,
+        
+        created_at TEXT,
+        updated_at TEXT,
+
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL
+      )
+    ''');
+
+          }
+
+          if (oldVersion < 6) {
+
+            await db.execute('''
+      ALTER TABLE events
+      ADD COLUMN article_id TEXT
+    ''');
+
+          }
+
+        },
     );
   }
 
@@ -82,6 +119,19 @@ class DbService {
         followers INTEGER NOT NULL DEFAULT 0
       )
     ''');
+    await db.execute('''
+      CREATE TABLE articles(
+        article_id TEXT PRIMARY KEY,
+        
+        title TEXT NOT NULL,
+        
+        created_at TEXT,
+        updated_at TEXT,
+    
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL
+      )
+''');
 
     await db.execute('''
       CREATE TABLE tags(
@@ -91,5 +141,78 @@ class DbService {
         tag TEXT NOT NULL
       )
     ''');
+  }
+  Future<List<Article>> getArticles() async {
+    final db = await database;
+
+    final maps = await db.query(
+      'articles',
+      orderBy: 'last_seen_at DESC',
+    );
+
+    return maps
+        .map((e) => Article.fromMap(e))
+        .toList();
+  }
+  Future<List<ArticleSnapshot>>
+  getSnapshotsByArticleId(
+      String articleId,
+      ) async {
+
+    final db = await database;
+
+    final maps = await db.query(
+      'snapshots',
+      where: 'article_id = ?',
+      whereArgs: [articleId],
+      orderBy: 'timestamp ASC',
+    );
+
+    return maps
+        .map((e) => ArticleSnapshot.fromMap(e))
+        .toList();
+  }
+
+  Future<List<AppEvent>>
+  getEventsByArticleId(
+      String articleId,
+      ) async {
+
+    final db = await database;
+
+    final maps = await db.query(
+      'events',
+      where: 'article_id = ?',
+      whereArgs: [articleId],
+      orderBy: 'timestamp ASC',
+    );
+
+    return maps
+        .map((e) => AppEvent.fromMap(e))
+        .toList();
+  }
+  Future<List<AppEvent>> getAllEvents() async {
+
+    final db = await database;
+
+    final maps = await db.query(
+      'events',
+      orderBy: 'timestamp DESC',
+    );
+
+    return maps
+        .map((e) => AppEvent.fromMap(e))
+        .toList();
+  }
+  Future<void> insertEvent(
+      AppEvent event,
+      ) async {
+
+    final db = await database;
+
+    await db.insert(
+      'events',
+      event.toMap(),
+    );
   }
 }

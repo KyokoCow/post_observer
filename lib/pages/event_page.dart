@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/event.dart';
 import '../services/db_service.dart';
 
 class EventPage extends StatefulWidget {
@@ -12,7 +13,8 @@ class EventPage extends StatefulWidget {
 
 class _EventPageState
     extends State<EventPage> {
-  List<Map<String, dynamic>> events = [];
+
+  List<AppEvent> events = [];
 
   @override
   void initState() {
@@ -21,18 +23,15 @@ class _EventPageState
   }
 
   Future<void> load() async {
-    final db =
-    await DbService.instance.database;
 
-    events = await db.query(
-      'events',
-      orderBy: 'timestamp DESC',
-    );
+    events =
+    await DbService.instance.getAllEvents();
 
     setState(() {});
   }
 
   Future<void> deleteEvent(int id) async {
+
     final db =
     await DbService.instance.database;
 
@@ -47,44 +46,60 @@ class _EventPageState
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('イベントログ'),
       ),
+
       body: ListView.builder(
         itemCount: events.length,
-        itemBuilder: (context, index) {
-          final e = events[index];
 
-          final syncId = e['sync_id'];
+        itemBuilder: (context, index) {
+
+          final e = events[index];
 
           return Card(
             child: ListTile(
-              title: Text(
-                e['type'].toString(),
-              ),
+
+              title: Text(e.type),
 
               subtitle: Column(
                 crossAxisAlignment:
                 CrossAxisAlignment.start,
+
                 children: [
-                  Text(
-                    'sync_id: $syncId',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
+
+                  /// article_id
+                  if (e.articleId != null)
+                    Text(
+                      'article_id: ${e.articleId}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
                     ),
-                  ),
 
+                  /// sync_id
+                  if (e.syncId != null)
+                    Text(
+                      'sync_id: ${e.syncId}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+
+                  /// timestamp
                   Text(
-                    e['timestamp'].toString(),
+                    e.timestamp.toString(),
                   ),
 
-                  if ((e['memo'] ?? '')
-                      .toString()
+                  /// memo
+                  if ((e.memo ?? '')
                       .isNotEmpty)
                     Text(
-                      e['memo'].toString(),
+                      e.memo!,
                       style: const TextStyle(
                         color: Colors.grey,
                       ),
@@ -94,28 +109,45 @@ class _EventPageState
 
               trailing: IconButton(
                 icon: const Icon(Icons.delete),
+
                 onPressed: () async {
+
                   final ok =
                   await showDialog<bool>(
                     context: context,
+
                     builder: (_) {
+
                       return AlertDialog(
                         title:
                         const Text('削除確認'),
+
                         content: const Text(
-                            'このイベントを削除しますか？'),
+                          'このイベントを削除しますか？',
+                        ),
+
                         actions: [
+
                           TextButton(
                             onPressed: () =>
                                 Navigator.pop(
-                                    context, false),
+                                  context,
+                                  false,
+                                ),
+
                             child:
-                            const Text('キャンセル'),
+                            const Text(
+                              'キャンセル',
+                            ),
                           ),
+
                           TextButton(
                             onPressed: () =>
                                 Navigator.pop(
-                                    context, true),
+                                  context,
+                                  true,
+                                ),
+
                             child:
                             const Text('削除'),
                           ),
@@ -124,10 +156,10 @@ class _EventPageState
                     },
                   );
 
-                  if (ok == true) {
-                    await deleteEvent(
-                      e['id'] as int,
-                    );
+                  if (ok == true &&
+                      e.id != null) {
+
+                    await deleteEvent(e.id!);
                   }
                 },
               ),

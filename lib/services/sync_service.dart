@@ -84,6 +84,62 @@ class SyncService {
     );
 
     /// =========================
+    /// articles 保存
+    /// =========================
+
+    for (final item in items) {
+
+      final articleId = item['id'];
+
+      if (articleId == null) continue;
+
+      final existing = await db.query(
+        'articles',
+        where: 'article_id = ?',
+        whereArgs: [articleId],
+        limit: 1,
+      );
+
+      if (existing.isEmpty) {
+
+        /// 新規記事
+
+        await db.insert(
+          'articles',
+          {
+            'article_id': articleId,
+
+            'title': item['title'],
+
+            'created_at': item['created_at'],
+            'updated_at': item['updated_at'],
+
+            'first_seen_at': now,
+            'last_seen_at': now,
+          },
+        );
+
+      } else {
+
+        /// 既存記事更新
+
+        await db.update(
+          'articles',
+          {
+            'title': item['title'],
+
+            'created_at': item['created_at'],
+            'updated_at': item['updated_at'],
+
+            'last_seen_at': now,
+          },
+          where: 'article_id = ?',
+          whereArgs: [articleId],
+        );
+      }
+    }
+
+    /// =========================
     /// snapshots 保存
     /// =========================
 
