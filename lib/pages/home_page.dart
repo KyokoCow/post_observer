@@ -17,6 +17,7 @@ class _HomePageState extends State<HomePage> {
   final analytics = AnalyticsService();
 
   List<Map<String, dynamic>> articles = [];
+  Map<String, dynamic>? session;
 
   bool loading = false;
 
@@ -32,6 +33,7 @@ class _HomePageState extends State<HomePage> {
       await syncService.sync();
 
       articles = await analytics.latestArticles();
+      session = await analytics.latestSession();
 
       // ★ 差分をまとめて取得（FutureBuilder廃止）
       diffCache.clear();
@@ -103,43 +105,106 @@ class _HomePageState extends State<HomePage> {
           ? const Center(
         child: CircularProgressIndicator(),
       )
-          : ListView.builder(
-        itemCount: articles.length,
-        itemBuilder: (context, index) {
-          final a = articles[index];
+          : ListView(
+        children: [
 
-          final id = a['article_id'] as String;
-          final diff = diffCache[id] ?? 0;
+          /// =========================
+          /// ユーザー情報
+          /// =========================
 
-          return Card(
-            child: ListTile(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DetailPage(
-                      articleId: id,
-                      title: a['title'].toString(),
+          if (session != null)
+            Card(
+              margin: const EdgeInsets.all(12),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'あなたの情報',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                );
-              },
 
-              title: Text(a['title'].toString()),
+                    const SizedBox(height: 12),
 
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('PV ${a['views']} (+$diff)'),
-                  Text('LGTM ${a['likes']}'),
-                  Text('Stock ${a['stocks']}'),
-                ],
+                    Text(
+                      '記事数: ${session!['total_articles']}',
+                    ),
+
+                    Text(
+                      '総PV: ${session!['total_views']}',
+                    ),
+
+                    Text(
+                      '総LGTM: ${session!['total_likes']}',
+                    ),
+
+                    Text(
+                      '総Stock: ${session!['total_stocks']}',
+                    ),
+
+                    Text(
+                      'Follower: ${session!['followers']}',
+                    ),
+                  ],
+                ),
               ),
-
-              trailing: const Icon(Icons.chevron_right),
             ),
-          );
-        },
+
+          /// =========================
+          /// 記事一覧
+          /// =========================
+
+          ...articles.map((a) {
+            final id = a['article_id'] as String;
+            final diff = diffCache[id] ?? 0;
+
+            return Card(
+              child: ListTile(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DetailPage(
+                        articleId: id,
+                        title: a['title'].toString(),
+                      ),
+                    ),
+                  );
+                },
+
+                title: Text(
+                  a['title'].toString(),
+                ),
+
+                subtitle: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PV ${a['views']} (+$diff)',
+                    ),
+
+                    Text(
+                      'LGTM ${a['likes']}',
+                    ),
+
+                    Text(
+                      'Stock ${a['stocks']}',
+                    ),
+                  ],
+                ),
+
+                trailing:
+                const Icon(Icons.chevron_right),
+              ),
+            );
+          }),
+        ],
       ),
     );
   }

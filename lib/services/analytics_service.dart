@@ -37,6 +37,7 @@ class AnalyticsService {
 
     return latest - previous;
   }
+
   Future<List<Map<String, dynamic>>> history(
       String articleId,
       ) async {
@@ -48,5 +49,21 @@ class AnalyticsService {
       whereArgs: [articleId],
       orderBy: 'timestamp ASC',
     );
+  }
+
+  Future<Map<String, dynamic>?> latestSession() async {
+    final db = await DbService.instance.database;
+
+    final result = await db.query(
+      'sync_sessions',
+      orderBy: 'timestamp DESC',
+      limit: 1,
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return result.first;
   }
 }
