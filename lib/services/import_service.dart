@@ -4,34 +4,36 @@ import 'package:archive/archive_io.dart';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 
 import 'db_service.dart';
 
 class ImportService {
 
   /// =========================
-  /// sync_id変換テーブル
+  /// sync_id remap
   /// =========================
 
   final Map<int, int> _syncIdMap = {};
 
-  int _remapSyncId(int oldId) {
+  int _remapSyncId(
+      int oldId,
+      ) {
 
     return _syncIdMap.putIfAbsent(
       oldId,
           () =>
-      DateTime.now().millisecondsSinceEpoch +
+      DateTime.now()
+          .millisecondsSinceEpoch +
           _syncIdMap.length,
     );
   }
 
   /// =========================
-  /// メインImport
+  /// main import
   /// =========================
 
   Future<void> importAll() async {
-
-    /// zip選択
 
     final result =
     await FilePicker.platform.pickFiles(
@@ -51,7 +53,7 @@ class ImportService {
     }
 
     /// =========================
-    /// temp展開
+    /// temp extract
     /// =========================
 
     final tempDir =
@@ -64,7 +66,7 @@ class ImportService {
     );
 
     /// =========================
-    /// exportDir検出
+    /// root dir
     /// =========================
 
     final dirs = tempDir
@@ -80,6 +82,13 @@ class ImportService {
     }
 
     final rootDir = dirs.first;
+
+    final articlesFile = File(
+      join(
+        rootDir.path,
+        'articles.csv',
+      ),
+    );
 
     final snapshotsFile = File(
       join(
@@ -109,7 +118,7 @@ class ImportService {
       ),
     );
 
-    /// snapshots は必須
+    /// snapshots required
 
     if (!await snapshotsFile.exists()) {
 
@@ -117,6 +126,9 @@ class ImportService {
         'snapshots.csv が見つかりません',
       );
     }
+
+    final hasArticles =
+    await articlesFile.exists();
 
     final hasEvents =
     await eventsFile.exists();
@@ -131,17 +143,30 @@ class ImportService {
     await DbService.instance.database;
 
     /// =========================
-    /// 開発用フルクリア
+    /// clear
     /// =========================
 
+    await db.delete('articles');
+
     await db.delete('snapshots');
+
     await db.delete('events');
+
     await db.delete('tags');
+
     await db.delete('sync_sessions');
 
     /// =========================
     /// import
     /// =========================
+
+    if (hasArticles) {
+
+      await importArticles(
+        db,
+        articlesFile,
+      );
+    }
 
     await importSnapshots(
       db,
@@ -173,7 +198,7 @@ class ImportService {
     }
 
     /// =========================
-    /// temp削除
+    /// temp delete
     /// =========================
 
     await tempDir.delete(
@@ -182,11 +207,59 @@ class ImportService {
   }
 
   /// =========================
+  /// articles
+  /// =========================
+
+  Future<void> importArticles(
+      Database db,
+      File file,
+      ) async {
+
+    final content =
+    await file.readAsString();
+
+    final rows =
+    const CsvToListConverter()
+        .convert(content);
+
+    for (int i = 1; i < rows.length; i++) {
+
+      final row = rows[i];
+
+      await db.insert(
+        'articles',
+        {
+          'article_id': row[0],
+
+          'title': row[1],
+
+          'created_at':
+          row.length > 2
+              ? row[2]
+              : null,
+
+          'updated_at':
+          row.length > 3
+              ? row[3]
+              : null,
+
+          'first_seen_at':
+          row.length > 4
+              ? row[4]
+              : '',
+        },
+        conflictAlgorithm:
+        ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  /// =========================
   /// snapshots
   /// =========================
 
   Future<void> importSnapshots(
-      dynamic db,
+      Database db,
       File file,
       ) async {
 
@@ -202,7 +275,9 @@ class ImportService {
       final row = rows[i];
 
       final oldSyncId =
-      int.parse(row[0].toString());
+      int.parse(
+        row[0].toString(),
+      );
 
       final newSyncId =
       _remapSyncId(oldSyncId);
@@ -251,7 +326,7 @@ class ImportService {
   /// =========================
 
   Future<void> importEvents(
-      dynamic db,
+      Database db,
       File file,
       ) async {
 
@@ -267,7 +342,9 @@ class ImportService {
       final row = rows[i];
 
       final oldSyncId =
-      int.parse(row[0].toString());
+      int.parse(
+        row[0].toString(),
+      );
 
       final newSyncId =
       _remapSyncId(oldSyncId);
@@ -277,11 +354,30 @@ class ImportService {
         {
           'sync_id': newSyncId,
 
-          'type': row[1],
+          'article_id':
+          row.length > 1
+              ? row[1]
+              : null,
 
-          'memo': row[2],
+          'type':
+          row.length > 2
+              ? row[2]
+              : '',
 
-          'timestamp': row[3],
+          'memo':
+          row.length > 3
+              ? row[3]
+              : null,
+
+          'source':
+          row.length > 4
+              ? row[4]
+              : 'manual',
+
+          'timestamp':
+          row.length > 5
+              ? row[5]
+              : '',
         },
       );
     }
@@ -292,7 +388,7 @@ class ImportService {
   /// =========================
 
   Future<void> importTags(
-      dynamic db,
+      Database db,
       File file,
       ) async {
 
@@ -308,7 +404,9 @@ class ImportService {
       final row = rows[i];
 
       final oldSyncId =
-      int.parse(row[0].toString());
+      int.parse(
+        row[0].toString(),
+      );
 
       final newSyncId =
       _remapSyncId(oldSyncId);
@@ -331,7 +429,7 @@ class ImportService {
   /// =========================
 
   Future<void> importSyncSessions(
-      dynamic db,
+      Database db,
       File file,
       ) async {
 
@@ -347,7 +445,9 @@ class ImportService {
       final row = rows[i];
 
       final oldSyncId =
-      int.parse(row[0].toString());
+      int.parse(
+        row[0].toString(),
+      );
 
       final newSyncId =
       _remapSyncId(oldSyncId);

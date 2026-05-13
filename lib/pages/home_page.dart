@@ -1,66 +1,109 @@
 import 'package:flutter/material.dart';
 
 import '../pages/detail_page.dart';
-import '../services/analytics_service.dart';
-import '../services/sync_service.dart';
 import '../pages/settings_page.dart';
+
+import '../services/analytics_service.dart';
+import '../services/auto_sync_service.dart';
+import '../services/sync_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<HomePage> createState() =>
+      _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState
+    extends State<HomePage> {
+
   final syncService = SyncService();
+
   final analytics = AnalyticsService();
 
-  List<Map<String, dynamic>> articles = [];
+  List<Map<String, dynamic>>
+  articles = [];
+
   Map<String, dynamic>? session;
 
   bool loading = false;
 
-  // ★ PV差分キャッシュ（FutureBuilder廃止）
+  /// =========================
+  /// cache
+  /// =========================
+
   Map<String, int> diffCache = {};
-  Map<String, List<String>> tagCache = {};
+
+  Map<String, List<String>>
+  tagCache = {};
+
+  /// =========================
+  /// refresh
+  /// =========================
 
   Future<void> refresh() async {
+
     setState(() {
       loading = true;
     });
 
     try {
+
       await syncService.sync();
 
-      articles = await analytics.latestArticles();
-      session = await analytics.latestSession();
+      articles =
+      await analytics.latestArticles();
 
-      // ★ 差分をまとめて取得（FutureBuilder廃止）
+      session =
+      await analytics.latestSession();
+
+      /// cache rebuild
+
       diffCache.clear();
+
       tagCache.clear();
 
       for (final a in articles) {
-        final id = a['article_id'] as String;
+
+        final id =
+        a['article_id'] as String;
 
         try {
-          diffCache[id] = await analytics.dailyIncrease(id);
+
+          diffCache[id] =
+          await analytics.dailyIncrease(id);
+
           tagCache[id] =
           await analytics.tags(id);
+
         } catch (e) {
+
           diffCache[id] = 0;
         }
       }
+
     } catch (e) {
-      debugPrint('SYNC ERROR: $e');
+
+      debugPrint(
+        'SYNC ERROR: $e',
+      );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('同期エラー: $e')),
+
+        ScaffoldMessenger.of(context)
+            .showSnackBar(
+          SnackBar(
+            content:
+            Text('同期エラー: $e'),
+          ),
         );
       }
+
     } finally {
+
       if (mounted) {
+
         setState(() {
           loading = false;
         });
@@ -68,31 +111,75 @@ class _HomePageState extends State<HomePage> {
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('同期完了')),
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        const SnackBar(
+          content: Text('同期完了'),
+        ),
       );
     }
   }
 
+  /// =========================
+  /// init
+  /// =========================
+
   @override
   void initState() {
+
     super.initState();
+
+    /// 初回同期
+
     refresh();
+
+    /// 自動同期開始
+
+    AutoSyncService
+        .instance
+        .start();
+  }
+
+  /// =========================
+  /// dispose
+  /// =========================
+
+  @override
+  void dispose() {
+
+    AutoSyncService
+        .instance
+        .stop();
+
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
+
       appBar: AppBar(
-        title: const Text('Qiita Observer'),
+
+        title:
+        const Text('Qiita Observer'),
+
         actions: [
+
           IconButton(
-            icon: const Icon(Icons.settings),
+
+            icon:
+            const Icon(Icons.settings),
+
             onPressed: () {
+
               Navigator.push(
                 context,
+
                 MaterialPageRoute(
-                  builder: (_) => const SettingsPage(),
+                  builder: (_) =>
+                  const SettingsPage(),
                 ),
               );
             },
@@ -100,59 +187,87 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
 
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton:
+      FloatingActionButton(
+
         onPressed: refresh,
-        child: const Icon(Icons.sync),
+
+        child:
+        const Icon(Icons.sync),
       ),
 
       body: loading
+
           ? const Center(
-        child: CircularProgressIndicator(),
+        child:
+        CircularProgressIndicator(),
       )
+
           : ListView(
+
         children: [
 
           /// =========================
-          /// ユーザー情報
+          /// user info
           /// =========================
 
           if (session != null)
+
             Card(
-              margin: const EdgeInsets.all(12),
+
+              margin:
+              const EdgeInsets.all(12),
+
               child: Padding(
-                padding: const EdgeInsets.all(16),
+
+                padding:
+                const EdgeInsets.all(16),
+
                 child: Column(
+
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
+
                   children: [
+
                     const Text(
+
                       'あなたの情報',
+
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        fontWeight:
+                        FontWeight.bold,
                       ),
                     ),
 
-                    const SizedBox(height: 12),
-
-                    Text(
-                      '記事数: ${session!['total_articles']}',
+                    const SizedBox(
+                      height: 12,
                     ),
 
                     Text(
-                      '総PV: ${session!['total_views']}',
+                      '記事数: '
+                          '${session!['total_articles']}',
                     ),
 
                     Text(
-                      '総LGTM: ${session!['total_likes']}',
+                      '総PV: '
+                          '${session!['total_views']}',
                     ),
 
                     Text(
-                      '総Stock: ${session!['total_stocks']}',
+                      '総LGTM: '
+                          '${session!['total_likes']}',
                     ),
 
                     Text(
-                      'Follower: ${session!['followers']}',
+                      '総Stock: '
+                          '${session!['total_stocks']}',
+                    ),
+
+                    Text(
+                      'Follower: '
+                          '${session!['followers']}',
                     ),
                   ],
                 ),
@@ -160,23 +275,37 @@ class _HomePageState extends State<HomePage> {
             ),
 
           /// =========================
-          /// 記事一覧
+          /// articles
           /// =========================
 
           ...articles.map((a) {
-            final id = a['article_id'] as String;
-            final diff = diffCache[id] ?? 0;
+
+            final id =
+            a['article_id'] as String;
+
+            final diff =
+                diffCache[id] ?? 0;
 
             return Card(
+
               child: ListTile(
+
                 onTap: () {
+
                   Navigator.push(
                     context,
+
                     MaterialPageRoute(
-                      builder: (_) => DetailPage(
-                        articleId: id,
-                        title: a['title'].toString(),
-                      ),
+
+                      builder: (_) =>
+                          DetailPage(
+
+                            articleId: id,
+
+                            title:
+                            a['title']
+                                .toString(),
+                          ),
                     ),
                   );
                 },
@@ -186,14 +315,19 @@ class _HomePageState extends State<HomePage> {
                 ),
 
                 subtitle: Column(
+
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
+
                   children: [
 
-                    const SizedBox(height: 4),
+                    const SizedBox(
+                      height: 4,
+                    ),
 
                     Text(
-                      'PV ${a['views']} (+$diff)',
+                      'PV ${a['views']} '
+                          '(+$diff)',
                     ),
 
                     Text(
@@ -205,38 +339,60 @@ class _HomePageState extends State<HomePage> {
                     ),
 
                     Text(
-                      'Comments ${a['comments']}',
+                      'Comments '
+                          '${a['comments']}',
                     ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(
+                      height: 8,
+                    ),
 
                     Text(
-                      'Created: ${a['created_at']}',
-                      style: const TextStyle(
+
+                      'Created: '
+                          '${a['created_at']}',
+
+                      style:
+                      const TextStyle(
                         fontSize: 12,
                         color: Colors.grey,
                       ),
                     ),
 
                     Text(
-                      'Updated: ${a['updated_at']}',
-                      style: const TextStyle(
+
+                      'Updated: '
+                          '${a['updated_at']}',
+
+                      style:
+                      const TextStyle(
                         fontSize: 12,
                         color: Colors.grey,
                       ),
                     ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(
+                      height: 8,
+                    ),
 
                     Wrap(
+
                       spacing: 4,
+
                       runSpacing: 4,
+
                       children:
-                      (tagCache[id] ?? []).map((tag) {
+                      (tagCache[id] ?? [])
+                          .map((tag) {
+
                         return Chip(
+
                           label: Text(
+
                             tag,
-                            style: const TextStyle(
+
+                            style:
+                            const TextStyle(
                               fontSize: 10,
                             ),
                           ),
@@ -244,13 +400,16 @@ class _HomePageState extends State<HomePage> {
                           visualDensity:
                           VisualDensity.compact,
                         );
+
                       }).toList(),
                     ),
                   ],
                 ),
 
                 trailing:
-                const Icon(Icons.chevron_right),
+                const Icon(
+                  Icons.chevron_right,
+                ),
               ),
             );
           }),
