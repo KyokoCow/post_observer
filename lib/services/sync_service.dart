@@ -1,26 +1,29 @@
 import 'package:flutter/cupertino.dart';
-import 'package:sqflite/sqflite.dart';
+
+import '../models/event.dart';
 
 import 'db_service.dart';
 import 'qiita_service.dart';
 
 class SyncService {
+
   final qiita = QiitaService();
 
   Future<void> sync() async {
+
     final db = await DbService.instance.database;
 
     final items = await qiita.fetchItems();
+
     final user = await qiita.fetchUser();
 
     final now = DateTime.now().toIso8601String();
 
-    // ★ 同期単位ID
     final syncId =
         DateTime.now().millisecondsSinceEpoch;
 
     /// =========================
-    /// 集計値計算
+    /// 集計
     /// =========================
 
     int totalViews = 0;
@@ -28,6 +31,7 @@ class SyncService {
     int totalStocks = 0;
 
     for (final item in items) {
+
       totalViews +=
       (item['page_views_count'] ?? 0) as int;
 
@@ -41,30 +45,6 @@ class SyncService {
     final followers =
     (user['followers_count'] ?? 0) as int;
 
-    debugPrint(
-        "first item title = ${items.first['title']}"
-    );
-
-    debugPrint(
-        "comments = ${items.first['comments_count']}"
-    );
-
-    debugPrint(
-        "created_at = ${items.first['created_at']}"
-    );
-
-    debugPrint(
-        "updated_at = ${items.first['updated_at']}"
-    );
-
-    debugPrint(
-        "tags = ${items.first['tags']}"
-    );
-
-    debugPrint(
-        "followers = $followers"
-    );
-
     /// =========================
     /// sync_sessions 保存
     /// =========================
@@ -76,15 +56,17 @@ class SyncService {
         'timestamp': now,
 
         'total_articles': items.length,
+
         'total_views': totalViews,
         'total_likes': totalLikes,
         'total_stocks': totalStocks,
+
         'followers': followers,
       },
     );
 
     /// =========================
-    /// articles 保存
+    /// article / event 更新
     /// =========================
 
     for (final item in items) {
@@ -93,6 +75,12 @@ class SyncService {
 
       if (articleId == null) continue;
 
+      final apiCreatedAt =
+      item['created_at'];
+
+      final apiUpdatedAt =
+      item['updated_at'];
+
       final existing = await db.query(
         'articles',
         where: 'article_id = ?',
@@ -100,9 +88,11 @@ class SyncService {
         limit: 1,
       );
 
-      if (existing.isEmpty) {
+      /// =========================
+      /// 新規記事
+      /// =========================
 
-        /// 新規記事
+      if (existing.isEmpty) {
 
         await db.insert(
           'articles',
@@ -111,62 +101,116 @@ class SyncService {
 
             'title': item['title'],
 
-            'created_at': item['created_at'],
-            'updated_at': item['updated_at'],
+            'created_at': apiCreatedAt,
+
+            'updated_at': apiUpdatedAt,
 
             'first_seen_at': now,
-            'last_seen_at': now,
+          },
+        );
+
+        /// posted event
+
+        await db.insert(
+          'events',
+          {
+            'sync_id': syncId,
+
+            'article_id': articleId,
+
+            'type': EventType.posted,
+
+            'memo': null,
+
+            'source': EventSource.auto,
+
+            'timestamp': apiCreatedAt,
           },
         );
 
       } else {
 
-        /// 既存記事更新
+        final current =
+            existing.first;
 
-        await db.update(
-          'articles',
-          {
-            'title': item['title'],
+        final currentUpdatedAt =
+        current['updated_at'];
 
-            'created_at': item['created_at'],
-            'updated_at': item['updated_at'],
+        /// =========================
+        /// 更新検出
+        /// =========================
 
-            'last_seen_at': now,
-          },
-          where: 'article_id = ?',
-          whereArgs: [articleId],
-        );
+        if (
+        currentUpdatedAt !=
+            apiUpdatedAt
+        ) {
+
+          await db.update(
+            'articles',
+            {
+              'title': item['title'],
+
+              'created_at': apiCreatedAt,
+
+              'updated_at': apiUpdatedAt,
+            },
+            where: 'article_id = ?',
+            whereArgs: [articleId],
+          );
+
+          /// updated event
+
+          await db.insert(
+            'events',
+            {
+              'sync_id': syncId,
+
+              'article_id': articleId,
+
+              'type': EventType.updated,
+
+              'memo': null,
+
+              'source': EventSource.auto,
+
+              'timestamp': apiUpdatedAt,
+            },
+          );
+        }
       }
-    }
 
-    /// =========================
-    /// snapshots 保存
-    /// =========================
+      /// =========================
+      /// snapshots 保存
+      /// =========================
 
-    for (final item in items) {
       await db.insert(
         'snapshots',
         {
           'sync_id': syncId,
 
-          'article_id': item['id'],
+          'article_id': articleId,
+
           'title': item['title'],
 
           'views':
-          (item['page_views_count'] ?? 0) as int,
+          (item['page_views_count'] ?? 0)
+          as int,
 
           'likes':
-          (item['likes_count'] ?? 0) as int,
+          (item['likes_count'] ?? 0)
+          as int,
 
           'stocks':
-          (item['stocks_count'] ?? 0) as int,
+          (item['stocks_count'] ?? 0)
+          as int,
 
           'comments':
-          (item['comments_count'] ?? 0) as int,
+          (item['comments_count'] ?? 0)
+          as int,
 
-          'created_at': item['created_at'],
+          'created_at': apiCreatedAt,
 
-          'updated_at': item['updated_at'],
+          'updated_at': apiUpdatedAt,
 
           'timestamp': now,
         },
@@ -179,8 +223,11 @@ class SyncService {
       final tags = item['tags'];
 
       if (tags is List) {
+
         for (final tag in tags) {
-          final tagName = tag['name'];
+
+          final tagName =
+          tag['name'];
 
           if (tagName == null) continue;
 
@@ -188,7 +235,9 @@ class SyncService {
             'tags',
             {
               'sync_id': syncId,
-              'article_id': item['id'],
+
+              'article_id': articleId,
+
               'tag': tagName,
             },
           );
@@ -196,18 +245,8 @@ class SyncService {
       }
     }
 
-    /// =========================
-    /// 自動同期イベント（任意）
-    /// =========================
-
-    // await db.insert(
-    //   'events',
-    //   {
-    //     'sync_id': syncId,
-    //     'type': 'sync',
-    //     'memo': 'auto sync',
-    //     'timestamp': now,
-    //   },
-    // );
+    debugPrint(
+      'sync completed',
+    );
   }
 }

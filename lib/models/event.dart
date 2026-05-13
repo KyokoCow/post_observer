@@ -1,4 +1,23 @@
+class EventType {
+
+  static const posted = 'article_posted';
+
+  static const updated = 'article_updated';
+
+  static const shared = 'article_shared';
+
+  static const other = 'article_other';
+}
+
+class EventSource {
+
+  static const auto = 'auto';
+
+  static const manual = 'manual';
+}
+
 class AppEvent {
+
   final int? id;
 
   final int? syncId;
@@ -9,20 +28,30 @@ class AppEvent {
 
   final String? memo;
 
+  final String source;
+
   final DateTime timestamp;
 
   AppEvent({
     this.id,
+
     this.syncId,
+
     this.articleId,
+
     required this.type,
+
     this.memo,
+
+    required this.source,
+
     required this.timestamp,
   });
 
   factory AppEvent.fromMap(
       Map<String, dynamic> map,
       ) {
+
     return AppEvent(
       id: map['id'] as int?,
 
@@ -34,6 +63,8 @@ class AppEvent {
 
       memo: map['memo'] as String?,
 
+      source: map['source'] as String,
+
       timestamp: DateTime.parse(
         map['timestamp'] as String,
       ),
@@ -41,6 +72,7 @@ class AppEvent {
   }
 
   Map<String, dynamic> toMap() {
+
     return {
       'id': id,
 
@@ -51,6 +83,8 @@ class AppEvent {
       'type': type,
 
       'memo': memo,
+
+      'source': source,
 
       'timestamp':
       timestamp.toIso8601String(),
