@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'db_service.dart';
 import 'sync_service.dart';
 
 class AutoSyncService {
@@ -19,18 +20,59 @@ class AutoSyncService {
   /// 開始
   /// =========================
 
-  void start() {
+  Future<void> start() async {
+
+    /// 既に動作中
 
     if (_timer != null) {
       return;
     }
 
-    debugPrint(
-      'AutoSync started',
+    /// =========================
+    /// 設定取得
+    /// =========================
+
+    final enabled =
+    await DbService.instance.getSetting(
+      'auto_sync_enabled',
     );
 
+    final minutesStr =
+    await DbService.instance.getSetting(
+      'auto_sync_minutes',
+    );
+
+    /// OFFなら開始しない
+
+    if (enabled != 'true') {
+
+      debugPrint(
+        'AutoSync disabled',
+      );
+
+      return;
+    }
+
+    /// 間隔
+
+    final minutes =
+        int.tryParse(
+          minutesStr ?? '60',
+        ) ??
+            60;
+
+    debugPrint(
+      'AutoSync started '
+          '($minutes min)',
+    );
+
+    /// =========================
+    /// Timer開始
+    /// =========================
+
     _timer = Timer.periodic(
-      const Duration(hours: 1),
+
+      Duration(minutes: minutes),
 
           (_) async {
 
@@ -64,6 +106,18 @@ class AutoSyncService {
         }
       },
     );
+  }
+
+  /// =========================
+  /// 再起動
+  /// 設定変更時用
+  /// =========================
+
+  Future<void> restart() async {
+
+    stop();
+
+    await start();
   }
 
   /// =========================

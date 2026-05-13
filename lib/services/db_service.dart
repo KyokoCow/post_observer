@@ -6,33 +6,55 @@ import '../models/article_snapshot.dart';
 import '../models/event.dart';
 
 class DbService {
-  static final DbService instance = DbService._();
+
+  static final DbService instance =
+  DbService._();
 
   DbService._();
 
   Database? _database;
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
+
+    if (_database != null) {
+      return _database!;
+    }
+
     _database = await _init();
+
     return _database!;
   }
 
   Future<Database> _init() async {
+
     final path = join(
       await getDatabasesPath(),
       'qiita_observer.db',
     );
 
     return openDatabase(
-      path,
-      version: 8,
 
-      onCreate: (db, version) async {
+      path,
+
+      version: 9,
+
+      onCreate: (
+          db,
+          version,
+          ) async {
+
         await _createAll(db);
       },
 
-      onUpgrade: (db, oldVersion, newVersion) async {
+      onUpgrade: (
+          db,
+          oldVersion,
+          newVersion,
+          ) async {
+
+        /// =========================
+        /// old dev reset
+        /// =========================
 
         if (oldVersion < 3) {
 
@@ -46,6 +68,10 @@ class DbService {
 
           await _createAll(db);
         }
+
+        /// =========================
+        /// articles
+        /// =========================
 
         if (oldVersion < 5) {
 
@@ -63,6 +89,10 @@ class DbService {
           ''');
         }
 
+        /// =========================
+        /// events.article_id
+        /// =========================
+
         if (oldVersion < 6) {
 
           await db.execute('''
@@ -71,18 +101,74 @@ class DbService {
           ''');
         }
 
+        /// =========================
+        /// events.source
+        /// =========================
+
         if (oldVersion < 8) {
 
           await db.execute('''
             ALTER TABLE events
             ADD COLUMN source TEXT
           ''');
+
+          /// NULL対策
+
+          await db.execute('''
+            UPDATE events
+            SET source = 'manual'
+            WHERE source IS NULL
+          ''');
+        }
+
+        /// =========================
+        /// settings table
+        /// =========================
+
+        if (oldVersion < 9) {
+
+          await db.execute('''
+            CREATE TABLE settings(
+              key TEXT PRIMARY KEY,
+              value TEXT NOT NULL
+            )
+          ''');
+
+          /// default values
+
+          await db.insert(
+            'settings',
+            {
+              'key':
+              'auto_sync_enabled',
+
+              'value':
+              'false',
+            },
+          );
+
+          await db.insert(
+            'settings',
+            {
+              'key':
+              'auto_sync_minutes',
+
+              'value':
+              '60',
+            },
+          );
         }
       },
     );
   }
 
-  Future<void> _createAll(Database db) async {
+  Future<void> _createAll(
+      Database db,
+      ) async {
+
+    /// =========================
+    /// snapshots
+    /// =========================
 
     await db.execute('''
       CREATE TABLE snapshots(
@@ -107,6 +193,10 @@ class DbService {
       )
     ''');
 
+    /// =========================
+    /// events
+    /// =========================
+
     await db.execute('''
       CREATE TABLE events(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -125,6 +215,10 @@ class DbService {
       )
     ''');
 
+    /// =========================
+    /// sync_sessions
+    /// =========================
+
     await db.execute('''
       CREATE TABLE sync_sessions(
         sync_id INTEGER PRIMARY KEY,
@@ -140,6 +234,10 @@ class DbService {
       )
     ''');
 
+    /// =========================
+    /// articles
+    /// =========================
+
     await db.execute('''
       CREATE TABLE articles(
         article_id TEXT PRIMARY KEY,
@@ -153,6 +251,10 @@ class DbService {
       )
     ''');
 
+    /// =========================
+    /// tags
+    /// =========================
+
     await db.execute('''
       CREATE TABLE tags(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,9 +266,49 @@ class DbService {
         tag TEXT NOT NULL
       )
     ''');
+
+    /// =========================
+    /// settings
+    /// =========================
+
+    await db.execute('''
+      CREATE TABLE settings(
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+
+    /// default settings
+
+    await db.insert(
+      'settings',
+      {
+        'key':
+        'auto_sync_enabled',
+
+        'value':
+        'true',
+      },
+    );
+
+    await db.insert(
+      'settings',
+      {
+        'key':
+        'auto_sync_minutes',
+
+        'value':
+        '60',
+      },
+    );
   }
 
-  Future<List<Article>> getArticles() async {
+  /// =========================
+  /// articles
+  /// =========================
+
+  Future<List<Article>>
+  getArticles() async {
 
     final db = await database;
 
@@ -176,9 +318,14 @@ class DbService {
     );
 
     return maps
-        .map((e) => Article.fromMap(e))
+        .map((e) =>
+        Article.fromMap(e))
         .toList();
   }
+
+  /// =========================
+  /// snapshots
+  /// =========================
 
   Future<List<ArticleSnapshot>>
   getSnapshotsByArticleId(
@@ -189,15 +336,23 @@ class DbService {
 
     final maps = await db.query(
       'snapshots',
+
       where: 'article_id = ?',
+
       whereArgs: [articleId],
+
       orderBy: 'timestamp ASC',
     );
 
     return maps
-        .map((e) => ArticleSnapshot.fromMap(e))
+        .map((e) =>
+        ArticleSnapshot.fromMap(e))
         .toList();
   }
+
+  /// =========================
+  /// events by article
+  /// =========================
 
   Future<List<AppEvent>>
   getEventsByArticleId(
@@ -208,17 +363,26 @@ class DbService {
 
     final maps = await db.query(
       'events',
+
       where: 'article_id = ?',
+
       whereArgs: [articleId],
+
       orderBy: 'timestamp ASC',
     );
 
     return maps
-        .map((e) => AppEvent.fromMap(e))
+        .map((e) =>
+        AppEvent.fromMap(e))
         .toList();
   }
 
-  Future<List<AppEvent>> getAllEvents() async {
+  /// =========================
+  /// all events
+  /// =========================
+
+  Future<List<AppEvent>>
+  getAllEvents() async {
 
     final db = await database;
 
@@ -228,9 +392,14 @@ class DbService {
     );
 
     return maps
-        .map((e) => AppEvent.fromMap(e))
+        .map((e) =>
+        AppEvent.fromMap(e))
         .toList();
   }
+
+  /// =========================
+  /// insert event
+  /// =========================
 
   Future<void> insertEvent(
       AppEvent event,
@@ -241,6 +410,49 @@ class DbService {
     await db.insert(
       'events',
       event.toMap(),
+    );
+  }
+
+  /// =========================
+  /// settings
+  /// =========================
+
+  Future<String?> getSetting(
+      String key,
+      ) async {
+
+    final db = await database;
+
+    final result = await db.query(
+      'settings',
+      where: 'key = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return result.first['value'] as String;
+  }
+
+  Future<void> setSetting(
+      String key,
+      String value,
+      ) async {
+
+    final db = await database;
+
+    await db.insert(
+      'settings',
+      {
+        'key': key,
+        'value': value,
+      },
+
+      conflictAlgorithm:
+      ConflictAlgorithm.replace,
     );
   }
 }

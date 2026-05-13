@@ -8,7 +8,10 @@ import '../services/auto_sync_service.dart';
 import '../services/sync_service.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+
+  const HomePage({
+    super.key,
+  });
 
   @override
   State<HomePage> createState() =>
@@ -18,9 +21,11 @@ class HomePage extends StatefulWidget {
 class _HomePageState
     extends State<HomePage> {
 
-  final syncService = SyncService();
+  final syncService =
+  SyncService();
 
-  final analytics = AnalyticsService();
+  final analytics =
+  AnalyticsService();
 
   List<Map<String, dynamic>>
   articles = [];
@@ -33,7 +38,8 @@ class _HomePageState
   /// cache
   /// =========================
 
-  Map<String, int> diffCache = {};
+  Map<String, int>
+  diffCache = {};
 
   Map<String, List<String>>
   tagCache = {};
@@ -42,45 +48,34 @@ class _HomePageState
   /// refresh
   /// =========================
 
-  Future<void> refresh() async {
+  Future<void> refresh({
+    bool showSnackBar = true,
+  }) async {
 
-    setState(() {
-      loading = true;
-    });
+    if (mounted) {
+
+      setState(() {
+        loading = true;
+      });
+    }
 
     try {
 
       await syncService.sync();
 
-      articles =
-      await analytics.latestArticles();
+      await reloadOnly();
 
-      session =
-      await analytics.latestSession();
+      if (showSnackBar &&
+          mounted) {
 
-      /// cache rebuild
+        ScaffoldMessenger.of(context)
+            .showSnackBar(
 
-      diffCache.clear();
-
-      tagCache.clear();
-
-      for (final a in articles) {
-
-        final id =
-        a['article_id'] as String;
-
-        try {
-
-          diffCache[id] =
-          await analytics.dailyIncrease(id);
-
-          tagCache[id] =
-          await analytics.tags(id);
-
-        } catch (e) {
-
-          diffCache[id] = 0;
-        }
+          const SnackBar(
+            content:
+            Text('同期完了'),
+          ),
+        );
       }
 
     } catch (e) {
@@ -93,6 +88,7 @@ class _HomePageState
 
         ScaffoldMessenger.of(context)
             .showSnackBar(
+
           SnackBar(
             content:
             Text('同期エラー: $e'),
@@ -109,15 +105,47 @@ class _HomePageState
         });
       }
     }
+  }
+
+  /// =========================
+  /// DB再読み込みのみ
+  /// =========================
+
+  Future<void> reloadOnly() async {
+
+    articles =
+    await analytics.latestArticles();
+
+    session =
+    await analytics.latestSession();
+
+    /// cache rebuild
+
+    diffCache.clear();
+
+    tagCache.clear();
+
+    for (final a in articles) {
+
+      final id =
+      a['article_id'] as String;
+
+      try {
+
+        diffCache[id] =
+        await analytics.dailyIncrease(id);
+
+        tagCache[id] =
+        await analytics.tags(id);
+
+      } catch (e) {
+
+        diffCache[id] = 0;
+      }
+    }
 
     if (mounted) {
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text('同期完了'),
-        ),
-      );
+      setState(() {});
     }
   }
 
@@ -130,13 +158,20 @@ class _HomePageState
 
     super.initState();
 
+    init();
+  }
+
+  Future<void> init() async {
+
     /// 初回同期
 
-    refresh();
+    await refresh(
+      showSnackBar: false,
+    );
 
     /// 自動同期開始
 
-    AutoSyncService
+    await AutoSyncService
         .instance
         .start();
   }
@@ -156,25 +191,32 @@ class _HomePageState
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context,
+      ) {
 
     return Scaffold(
 
       appBar: AppBar(
 
         title:
-        const Text('Qiita Observer'),
+        const Text(
+          'Qiita Observer',
+        ),
 
         actions: [
 
           IconButton(
 
             icon:
-            const Icon(Icons.settings),
+            const Icon(
+              Icons.settings,
+            ),
 
-            onPressed: () {
+            onPressed: () async {
 
-              Navigator.push(
+              await Navigator.push(
+
                 context,
 
                 MaterialPageRoute(
@@ -182,6 +224,10 @@ class _HomePageState
                   const SettingsPage(),
                 ),
               );
+
+              /// 設定変更後再読込
+
+              await reloadOnly();
             },
           ),
         ],
@@ -190,10 +236,15 @@ class _HomePageState
       floatingActionButton:
       FloatingActionButton(
 
-        onPressed: refresh,
+        onPressed: () {
+
+          refresh();
+        },
 
         child:
-        const Icon(Icons.sync),
+        const Icon(
+          Icons.sync,
+        ),
       ),
 
       body: loading
@@ -293,6 +344,7 @@ class _HomePageState
                 onTap: () {
 
                   Navigator.push(
+
                     context,
 
                     MaterialPageRoute(
@@ -311,7 +363,8 @@ class _HomePageState
                 },
 
                 title: Text(
-                  a['title'].toString(),
+                  a['title']
+                      .toString(),
                 ),
 
                 subtitle: Column(
@@ -355,7 +408,8 @@ class _HomePageState
                       style:
                       const TextStyle(
                         fontSize: 12,
-                        color: Colors.grey,
+                        color:
+                        Colors.grey,
                       ),
                     ),
 
@@ -367,7 +421,8 @@ class _HomePageState
                       style:
                       const TextStyle(
                         fontSize: 12,
-                        color: Colors.grey,
+                        color:
+                        Colors.grey,
                       ),
                     ),
 
