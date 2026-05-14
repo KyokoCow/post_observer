@@ -1,20 +1,5 @@
-class EventType {
-
-  static const posted = 'article_posted';
-
-  static const updated = 'article_updated';
-
-  static const shared = 'article_shared';
-
-  static const other = 'article_other';
-}
-
-class EventSource {
-
-  static const auto = 'auto';
-
-  static const manual = 'manual';
-}
+import 'event_source.dart';
+import 'event_type.dart';
 
 class AppEvent {
 
@@ -24,28 +9,25 @@ class AppEvent {
 
   final String? articleId;
 
-  final String type;
+  final EventType type;
 
   final String? memo;
 
-  final String source;
+  final EventSource source;
 
-  final DateTime timestamp;
+  final DateTime eventAt;
+
+  final DateTime createdAt;
 
   AppEvent({
     this.id,
-
     this.syncId,
-
     this.articleId,
-
     required this.type,
-
     this.memo,
-
     required this.source,
-
-    required this.timestamp,
+    required this.eventAt,
+    required this.createdAt,
   });
 
   factory AppEvent.fromMap(
@@ -59,14 +41,22 @@ class AppEvent {
 
       articleId: map['article_id'] as String?,
 
-      type: map['type'] as String,
+      type: EventTypeExtension.fromString(
+        map['type'] as String,
+      ),
 
       memo: map['memo'] as String?,
 
-      source: map['source'] as String,
+      source: EventSourceExtension.fromString(
+        map['source'] as String,
+      ),
 
-      timestamp: DateTime.parse(
-        map['timestamp'] as String,
+      eventAt: DateTime.parse(
+        map['event_at'] as String,
+      ),
+
+      createdAt: DateTime.parse(
+        map['created_at'] as String,
       ),
     );
   }
@@ -80,14 +70,17 @@ class AppEvent {
 
       'article_id': articleId,
 
-      'type': type,
+      'type': type.value,
 
       'memo': memo,
 
-      'source': source,
+      'source': source.value,
 
-      'timestamp':
-      timestamp.toIso8601String(),
+      'event_at':
+      eventAt.toIso8601String(),
+
+      'created_at':
+      createdAt.toIso8601String(),
     };
   }
 }

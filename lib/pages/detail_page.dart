@@ -2,6 +2,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../models/event.dart';
+import '../models/event_source.dart';
+import '../models/event_type.dart';
+
 import '../services/analytics_service.dart';
 import '../services/db_service.dart';
 
@@ -43,6 +46,71 @@ class _DetailPageState
       widget.articleId,
     );
 
+    /// =========================
+    /// 投稿日時を左端にする
+    /// =========================
+
+    final db =
+    await DbService.instance.database;
+
+    final articleResult =
+    await db.query(
+      'articles',
+      where: 'article_id = ?',
+      whereArgs: [widget.articleId],
+      limit: 1,
+    );
+
+    if (
+    articleResult.isNotEmpty &&
+        history.isNotEmpty
+    ) {
+
+      final article =
+          articleResult.first;
+
+      final createdAtString =
+      article['created_at']
+      as String?;
+
+      if (createdAtString != null) {
+
+        final createdAt =
+        DateTime.parse(
+          createdAtString,
+        );
+
+        final firstSnapshot =
+        DateTime.parse(
+          history.first['timestamp'],
+        );
+
+        if (
+        createdAt.isBefore(
+          firstSnapshot,
+        )
+        ) {
+
+          history.insert(
+            0,
+            {
+              'timestamp':
+              createdAt
+                  .toIso8601String(),
+
+              'views': 0,
+
+              'likes': 0,
+
+              'stocks': 0,
+
+              'comments': 0,
+            },
+          );
+        }
+      }
+    }
+
     events = await DbService.instance
         .getEventsByArticleId(
       widget.articleId,
@@ -51,38 +119,38 @@ class _DetailPageState
     setState(() {});
   }
 
-  IconData _icon(String type) {
+  IconData _icon(EventType type) {
 
     switch (type) {
 
-      case EventType.posted:
+      case EventType.post:
         return Icons.publish;
 
-      case EventType.updated:
+      case EventType.update:
         return Icons.edit;
 
-      case EventType.shared:
+      case EventType.share:
         return Icons.share;
 
-      default:
+      case EventType.other:
         return Icons.circle;
     }
   }
 
-  Color _color(String type) {
+  Color _color(EventType type) {
 
     switch (type) {
 
-      case EventType.posted:
+      case EventType.post:
         return Colors.blue;
 
-      case EventType.updated:
+      case EventType.update:
         return Colors.orange;
 
-      case EventType.shared:
+      case EventType.share:
         return Colors.green;
 
-      default:
+      case EventType.other:
         return Colors.purple;
     }
   }
@@ -206,7 +274,7 @@ class _DetailPageState
                           events.where((e) {
 
                             final eventTime =
-                                e.timestamp;
+                                e.eventAt;
 
                             return eventTime
                                 .isBefore(
@@ -336,7 +404,7 @@ class _DetailPageState
                       ),
 
                       title: Text(
-                        e.type,
+                        e.type.label,
                       ),
 
                       subtitle: Column(
@@ -347,7 +415,7 @@ class _DetailPageState
                         children: [
 
                           Text(
-                            e.timestamp
+                            e.eventAt
                                 .toString(),
                           ),
 
@@ -359,7 +427,7 @@ class _DetailPageState
                             ),
 
                           Text(
-                            'source: ${e.source}',
+                            'source: ${e.source.label}',
                             style:
                             const TextStyle(
                               fontSize: 12,

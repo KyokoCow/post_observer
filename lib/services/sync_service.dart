@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 
 import '../models/event.dart';
 
+import '../models/event_source.dart';
+import '../models/event_type.dart';
 import 'db_service.dart';
 import 'qiita_service.dart';
 
@@ -118,13 +120,15 @@ class SyncService {
 
             'article_id': articleId,
 
-            'type': EventType.posted,
+            'type': EventType.post.value,
 
             'memo': null,
 
-            'source': EventSource.auto,
+            'source': EventSource.auto.value,
 
-            'timestamp': apiCreatedAt,
+            'event_at': apiCreatedAt,
+
+            'created_at': now,
           },
         );
 
@@ -167,13 +171,15 @@ class SyncService {
 
               'article_id': articleId,
 
-              'type': EventType.updated,
+              'type': EventType.update.value,
 
               'memo': null,
 
-              'source': EventSource.auto,
+              'source': EventSource.auto.value,
 
-              'timestamp': apiUpdatedAt,
+              'event_at': apiUpdatedAt,
+
+              'created_at': now,
             },
           );
         }

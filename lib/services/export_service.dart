@@ -233,29 +233,33 @@ class ExportService {
 
     final rows = await db.query(
       'events',
-      orderBy: 'timestamp ASC',
+      orderBy: 'event_at ASC',
     );
 
     final data = <List<dynamic>>[];
 
     data.add([
+      'id',
       'sync_id',
       'article_id',
       'type',
       'memo',
       'source',
-      'timestamp',
+      'event_at',
+      'created_at',
     ]);
 
     for (final row in rows) {
 
       data.add([
+        row['id'],
         row['sync_id'],
         row['article_id'],
         row['type'],
         row['memo'],
         row['source'],
-        row['timestamp'],
+        row['event_at'],
+        row['created_at'],
       ]);
     }
 

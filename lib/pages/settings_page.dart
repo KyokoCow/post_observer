@@ -240,7 +240,7 @@ class _SettingsPageState
             const Icon(Icons.event),
 
             title:
-            const Text('投稿イベント'),
+            const Text('イベント一覧'),
 
             trailing:
             const Icon(

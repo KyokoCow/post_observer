@@ -36,7 +36,7 @@ class DbService {
 
       path,
 
-      version: 9,
+      version: 10,
 
       onCreate: (
           db,
@@ -46,118 +46,38 @@ class DbService {
         await _createAll(db);
       },
 
+      /// 開発中なので全再生成
       onUpgrade: (
           db,
           oldVersion,
           newVersion,
           ) async {
 
-        /// =========================
-        /// old dev reset
-        /// =========================
+        await db.execute(
+          'DROP TABLE IF EXISTS snapshots',
+        );
 
-        if (oldVersion < 3) {
+        await db.execute(
+          'DROP TABLE IF EXISTS events',
+        );
 
-          await db.execute(
-            'DROP TABLE IF EXISTS snapshots',
-          );
+        await db.execute(
+          'DROP TABLE IF EXISTS sync_sessions',
+        );
 
-          await db.execute(
-            'DROP TABLE IF EXISTS events',
-          );
+        await db.execute(
+          'DROP TABLE IF EXISTS articles',
+        );
 
-          await _createAll(db);
-        }
+        await db.execute(
+          'DROP TABLE IF EXISTS tags',
+        );
 
-        /// =========================
-        /// articles
-        /// =========================
+        await db.execute(
+          'DROP TABLE IF EXISTS settings',
+        );
 
-        if (oldVersion < 5) {
-
-          await db.execute('''
-            CREATE TABLE articles(
-              article_id TEXT PRIMARY KEY,
-
-              title TEXT NOT NULL,
-
-              created_at TEXT,
-              updated_at TEXT,
-
-              first_seen_at TEXT NOT NULL
-            )
-          ''');
-        }
-
-        /// =========================
-        /// events.article_id
-        /// =========================
-
-        if (oldVersion < 6) {
-
-          await db.execute('''
-            ALTER TABLE events
-            ADD COLUMN article_id TEXT
-          ''');
-        }
-
-        /// =========================
-        /// events.source
-        /// =========================
-
-        if (oldVersion < 8) {
-
-          await db.execute('''
-            ALTER TABLE events
-            ADD COLUMN source TEXT
-          ''');
-
-          /// NULL対策
-
-          await db.execute('''
-            UPDATE events
-            SET source = 'manual'
-            WHERE source IS NULL
-          ''');
-        }
-
-        /// =========================
-        /// settings table
-        /// =========================
-
-        if (oldVersion < 9) {
-
-          await db.execute('''
-            CREATE TABLE settings(
-              key TEXT PRIMARY KEY,
-              value TEXT NOT NULL
-            )
-          ''');
-
-          /// default values
-
-          await db.insert(
-            'settings',
-            {
-              'key':
-              'auto_sync_enabled',
-
-              'value':
-              'false',
-            },
-          );
-
-          await db.insert(
-            'settings',
-            {
-              'key':
-              'auto_sync_minutes',
-
-              'value':
-              '60',
-            },
-          );
-        }
+        await _createAll(db);
       },
     );
   }
@@ -211,7 +131,9 @@ class DbService {
 
         source TEXT NOT NULL,
 
-        timestamp TEXT NOT NULL
+        event_at TEXT NOT NULL,
+
+        created_at TEXT NOT NULL
       )
     ''');
 
@@ -287,7 +209,7 @@ class DbService {
         'auto_sync_enabled',
 
         'value':
-        'true',
+        'false',
       },
     );
 
@@ -368,7 +290,7 @@ class DbService {
 
       whereArgs: [articleId],
 
-      orderBy: 'timestamp ASC',
+      orderBy: 'event_at ASC',
     );
 
     return maps
@@ -388,7 +310,7 @@ class DbService {
 
     final maps = await db.query(
       'events',
-      orderBy: 'timestamp DESC',
+      orderBy: 'event_at DESC',
     );
 
     return maps

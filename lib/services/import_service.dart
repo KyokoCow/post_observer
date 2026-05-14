@@ -341,48 +341,65 @@ class ImportService {
 
       final row = rows[i];
 
-      final oldSyncId =
-      int.parse(
-        row[0].toString(),
-      );
+      /// sync_id nullable
 
-      final newSyncId =
-      _remapSyncId(oldSyncId);
+      int? newSyncId;
+
+      if (row.length > 1 &&
+          row[1] != null &&
+          row[1]
+              .toString()
+              .isNotEmpty) {
+
+        final oldSyncId =
+        int.parse(
+          row[1].toString(),
+        );
+
+        newSyncId =
+            _remapSyncId(oldSyncId);
+      }
 
       await db.insert(
         'events',
         {
-          'sync_id': newSyncId,
+          'sync_id':
+          newSyncId,
 
           'article_id':
-          row.length > 1
-              ? row[1]
+          row.length > 2
+              ? row[2]
               : null,
 
           'type':
-          row.length > 2
-              ? row[2]
-              : '',
-
-          'memo':
           row.length > 3
               ? row[3]
+              : 'other',
+
+          'memo':
+          row.length > 4
+              ? row[4]
               : null,
 
           'source':
-          row.length > 4
-              ? row[4]
-              : 'manual',
-
-          'timestamp':
           row.length > 5
               ? row[5]
+              : 'manual',
+
+          'event_at':
+          row.length > 6
+              ? row[6]
               : '',
+
+          'created_at':
+          row.length > 7
+              ? row[7]
+              : DateTime.now()
+              .toIso8601String(),
         },
       );
     }
   }
-
   /// =========================
   /// tags
   /// =========================
