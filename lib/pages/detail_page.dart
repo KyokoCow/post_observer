@@ -42,81 +42,87 @@ class _DetailPageState
 
   Future<void> load() async {
 
-    history = await analytics.history(
-      widget.articleId,
-    );
+    try {
 
-    /// =========================
-    /// 投稿日時を左端にする
-    /// =========================
+      final rawHistory =
+      await analytics.history(
+        widget.articleId,
+      );
 
-    final db =
-    await DbService.instance.database;
+      debugPrint(
+        'history count: ${rawHistory.length}',
+      );
 
-    final articleResult =
-    await db.query(
-      'articles',
-      where: 'article_id = ?',
-      whereArgs: [widget.articleId],
-      limit: 1,
-    );
+      final mutableHistory =
+      List<Map<String, dynamic>>.from(
+        rawHistory,
+      );
 
-    if (
-    articleResult.isNotEmpty &&
-        history.isNotEmpty
-    ) {
+      if (mutableHistory.isNotEmpty) {
 
-      final article =
-          articleResult.first;
-
-      final createdAtString =
-      article['created_at']
-      as String?;
-
-      if (createdAtString != null) {
+        final first =
+            mutableHistory.first;
 
         final createdAt =
-        DateTime.parse(
-          createdAtString,
-        );
+        first['created_at'];
 
-        final firstSnapshot =
-        DateTime.parse(
-          history.first['timestamp'],
-        );
+        if (createdAt != null) {
 
-        if (
-        createdAt.isBefore(
-          firstSnapshot,
-        )
-        ) {
+          mutableHistory.insert(0, {
 
-          history.insert(
-            0,
-            {
-              'timestamp':
-              createdAt
-                  .toIso8601String(),
+            'views': 0,
+            'likes': 0,
+            'stocks': 0,
+            'comments': 0,
 
-              'views': 0,
+            'timestamp': createdAt,
 
-              'likes': 0,
-
-              'stocks': 0,
-
-              'comments': 0,
-            },
-          );
+            'created_at': createdAt,
+            'updated_at': createdAt,
+          });
         }
       }
+
+      final db =
+      await DbService.instance.database;
+
+      final eventMaps =
+      await db.query(
+
+        'events',
+
+        where: 'article_id = ?',
+
+        whereArgs: [
+          widget.articleId,
+        ],
+
+        orderBy: 'event_at ASC',
+      );
+
+      events =
+          eventMaps
+              .map(
+                (e) => AppEvent.fromMap(e),
+          )
+              .toList();
+
+      setState(() {
+
+        history =
+            mutableHistory;
+      });
+
+    } catch (e, st) {
+
+      debugPrint(
+        'DETAIL LOAD ERROR: $e',
+      );
+
+      debugPrint(
+        '$st',
+      );
     }
-
-    events = await DbService.instance
-        .getEventsByArticleId(
-      widget.articleId,
-    );
-
-    setState(() {});
   }
 
   IconData _icon(EventType type) {
@@ -177,7 +183,7 @@ class _DetailPageState
     for (int i = 0; i < history.length; i++) {
 
       final views =
-      (history[i]['views'] as int)
+      (history[i]['views'] as num)
           .toDouble();
 
       if (views > maxY) {
@@ -264,10 +270,16 @@ class _DetailPageState
                             return const SizedBox();
                           }
 
+                          final rawTimestamp =
+                          history[index]['timestamp'];
+
+                          if (rawTimestamp == null) {
+                            return const SizedBox();
+                          }
+
                           final timestamp =
                           DateTime.parse(
-                            history[index]
-                            ['timestamp'],
+                            rawTimestamp.toString(),
                           );
 
                           final pointEvents =

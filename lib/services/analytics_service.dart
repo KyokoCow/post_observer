@@ -1,69 +1,50 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'db_service.dart';
 
 class AnalyticsService {
-  Future<List<Map<String, dynamic>>> latestArticles() async {
-    final db = await DbService.instance.database;
 
-    final latestSession = await db.query(
-      'sync_sessions',
-      orderBy: 'timestamp DESC',
-      limit: 1,
-    );
+  /// =========================
+  /// 最新記事一覧
+  /// =========================
 
-    if (latestSession.isEmpty) {
-      return [];
-    }
+  Future<List<Map<String, dynamic>>>
+  latestArticles() async {
 
-    final syncId =
-    latestSession.first['sync_id'];
+    final db =
+    await DbService.instance.database;
 
-    return db.query(
-      'snapshots',
-      where: 'sync_id = ?',
-      whereArgs: [syncId],
-      orderBy: 'views DESC',
-    );
+    final result = await db.rawQuery('''
+      SELECT s.*
+      FROM snapshots s
+      INNER JOIN (
+        SELECT
+          article_id,
+          MAX(timestamp) as max_time
+        FROM snapshots
+        GROUP BY article_id
+      ) latest
+      ON s.article_id = latest.article_id
+      AND s.timestamp = latest.max_time
+      ORDER BY s.views DESC
+    ''');
+
+    return result;
   }
 
-  Future<int> dailyIncrease(String articleId) async {
-    final db = await DbService.instance.database;
+  /// =========================
+  /// 最新セッション
+  /// =========================
 
-    final rows = await db.query(
-      'snapshots',
-      where: 'article_id = ?',
-      whereArgs: [articleId],
-      orderBy: 'timestamp DESC',
-      limit: 2,
-    );
+  Future<Map<String, dynamic>?>
+  latestSession() async {
 
-    if (rows.length < 2) return 0;
-
-    final latest = rows[0]['views'] as int;
-    final previous = rows[1]['views'] as int;
-
-    return latest - previous;
-  }
-
-  Future<List<Map<String, dynamic>>> history(
-      String articleId,
-      ) async {
-    final db = await DbService.instance.database;
-
-    return db.query(
-      'snapshots',
-      where: 'article_id = ?',
-      whereArgs: [articleId],
-      orderBy: 'timestamp ASC',
-    );
-  }
-
-  Future<Map<String, dynamic>?> latestSession() async {
-    final db = await DbService.instance.database;
+    final db =
+    await DbService.instance.database;
 
     final result = await db.query(
-      'sync_sessions',
+      'sessions',
       orderBy: 'timestamp DESC',
       limit: 1,
     );
@@ -74,6 +55,43 @@ class AnalyticsService {
 
     return result.first;
   }
+
+  /// =========================
+  /// 日次増加
+  /// =========================
+
+  Future<int> dailyIncrease(
+      String articleId,
+      ) async {
+
+    final db =
+    await DbService.instance.database;
+
+    final result = await db.query(
+      'snapshots',
+      where: 'article_id = ?',
+      whereArgs: [articleId],
+      orderBy: 'timestamp DESC',
+      limit: 2,
+    );
+
+    if (result.length < 2) {
+      return 0;
+    }
+
+    final latest =
+    result[0]['views'] as int;
+
+    final previous =
+    result[1]['views'] as int;
+
+    return latest - previous;
+  }
+
+  /// =========================
+  /// tags
+  /// =========================
+
   Future<List<String>> tags(
       String articleId,
       ) async {
@@ -81,34 +99,74 @@ class AnalyticsService {
     final db =
     await DbService.instance.database;
 
-    final latest = await db.query(
+    try {
+
+      final result = await db.query(
+        'tags',
+        where: 'article_id = ?',
+        whereArgs: [articleId],
+      );
+
+      return result
+          .map(
+            (e) =>
+            e['tag_name'].toString(),
+      )
+          .toList();
+
+    } catch (e) {
+
+      debugPrint(
+        'tags error: $e',
+      );
+
+      return [];
+    }
+  }
+
+  /// =========================
+  /// history
+  /// =========================
+
+  Future<List<Map<String, dynamic>>>
+  history(
+      String articleId,
+      ) async {
+
+    final db =
+    await DbService.instance.database;
+
+    debugPrint(
+      'history() articleId = $articleId',
+    );
+
+    final all = await db.query(
+      'snapshots',
+      orderBy: 'timestamp ASC',
+    );
+
+    debugPrint(
+      'ALL snapshots count = ${all.length}',
+    );
+
+    for (final row in all) {
+
+      debugPrint(
+        'snapshot article_id = ${row['article_id']}',
+      );
+    }
+
+    final result = await db.query(
       'snapshots',
       where: 'article_id = ?',
       whereArgs: [articleId],
-      orderBy: 'timestamp DESC',
-      limit: 1,
+      orderBy: 'timestamp ASC',
     );
 
-    if (latest.isEmpty) {
-      return [];
-    }
-
-    final syncId =
-    latest.first['sync_id'];
-
-    final result = await db.query(
-      'tags',
-      where:
-      'article_id = ? AND sync_id = ?',
-      whereArgs: [
-        articleId,
-        syncId,
-      ],
+    debugPrint(
+      'filtered history count = ${result.length}',
     );
 
-    return result
-        .map((e) => e['tag'].toString())
-        .toSet()
-        .toList();
+    return result;
   }
 }
