@@ -380,7 +380,7 @@ class _DetailPageState
 
                       spots: spots,
 
-                      isCurved: true,
+                      isCurved: false,
 
                       barWidth: 3,
 
