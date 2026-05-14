@@ -8,12 +8,8 @@ class AnalyticsService {
   /// =========================
   /// 最新記事一覧
   /// =========================
-
-  Future<List<Map<String, dynamic>>>
-  latestArticles() async {
-
-    final db =
-    await DbService.instance.database;
+  Future<List<Map<String, dynamic>>> latestArticles() async {
+    final db = await DbService.instance.database;
 
     final result = await db.rawQuery('''
       SELECT s.*
@@ -34,38 +30,25 @@ class AnalyticsService {
   }
 
   /// =========================
-  /// 最新セッション
+  /// 最新スナップショット（sessions置換）
   /// =========================
-
-  Future<Map<String, dynamic>?>
-  latestSession() async {
-
-    final db =
-    await DbService.instance.database;
+  Future<Map<String, dynamic>?> latestSnapshot() async {
+    final db = await DbService.instance.database;
 
     final result = await db.query(
-      'sessions',
+      'snapshots',
       orderBy: 'timestamp DESC',
       limit: 1,
     );
 
-    if (result.isEmpty) {
-      return null;
-    }
-
-    return result.first;
+    return result.isEmpty ? null : result.first;
   }
 
   /// =========================
   /// 日次増加
   /// =========================
-
-  Future<int> dailyIncrease(
-      String articleId,
-      ) async {
-
-    final db =
-    await DbService.instance.database;
+  Future<int> dailyIncrease(String articleId) async {
+    final db = await DbService.instance.database;
 
     final result = await db.query(
       'snapshots',
@@ -79,11 +62,8 @@ class AnalyticsService {
       return 0;
     }
 
-    final latest =
-    result[0]['views'] as int;
-
-    final previous =
-    result[1]['views'] as int;
+    final latest = (result[0]['views'] as num?)?.toInt() ?? 0;
+    final previous = (result[1]['views'] as num?)?.toInt() ?? 0;
 
     return latest - previous;
   }
@@ -91,35 +71,28 @@ class AnalyticsService {
   /// =========================
   /// tags
   /// =========================
-
-  Future<List<String>> tags(
-      String articleId,
-      ) async {
-
-    final db =
-    await DbService.instance.database;
+  Future<List<String>> tags(String articleId) async {
+    final db = await DbService.instance.database;
 
     try {
-
       final result = await db.query(
         'tags',
         where: 'article_id = ?',
         whereArgs: [articleId],
       );
 
-      return result
-          .map(
-            (e) =>
-            e['tag_name'].toString(),
-      )
+      final tags = result
+          .map((e) =>
+          (e['tag_name'] ?? e['name'] ?? e['tag'] ?? '')
+              .toString()
+              .trim())
+          .where((t) => t.isNotEmpty)
           .toList();
 
+      return tags;
+
     } catch (e) {
-
-      debugPrint(
-        'tags error: $e',
-      );
-
+      debugPrint('tags error: $e');
       return [];
     }
   }
@@ -127,34 +100,10 @@ class AnalyticsService {
   /// =========================
   /// history
   /// =========================
+  Future<List<Map<String, dynamic>>> history(String articleId) async {
+    final db = await DbService.instance.database;
 
-  Future<List<Map<String, dynamic>>>
-  history(
-      String articleId,
-      ) async {
-
-    final db =
-    await DbService.instance.database;
-
-    debugPrint(
-      'history() articleId = $articleId',
-    );
-
-    final all = await db.query(
-      'snapshots',
-      orderBy: 'timestamp ASC',
-    );
-
-    debugPrint(
-      'ALL snapshots count = ${all.length}',
-    );
-
-    for (final row in all) {
-
-      debugPrint(
-        'snapshot article_id = ${row['article_id']}',
-      );
-    }
+    debugPrint('history() articleId = $articleId');
 
     final result = await db.query(
       'snapshots',
@@ -163,9 +112,7 @@ class AnalyticsService {
       orderBy: 'timestamp ASC',
     );
 
-    debugPrint(
-      'filtered history count = ${result.length}',
-    );
+    debugPrint('filtered history count = ${result.length}');
 
     return result;
   }
