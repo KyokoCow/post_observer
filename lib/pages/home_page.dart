@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../pages/detail_page.dart';
@@ -5,6 +6,7 @@ import '../pages/settings_page.dart';
 
 import '../services/analytics_service.dart';
 import '../services/auto_sync_service.dart';
+import '../services/db_service.dart';
 import '../services/sync_service.dart';
 
 class HomePage extends StatefulWidget {
@@ -26,6 +28,9 @@ class _HomePageState extends State<HomePage> {
   /// cache
   Map<String, int> diffCache = {};
   Map<String, List<String>> tagCache = {};
+  Map<String, dynamic>? user;
+  Map<String, dynamic>? session;
+  List<FlSpot> pvSpots = [];
 
   /// =========================
   /// refresh
@@ -47,7 +52,6 @@ class _HomePageState extends State<HomePage> {
         );
       }
     } catch (e) {
-      debugPrint('SYNC ERROR: $e');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -67,10 +71,45 @@ class _HomePageState extends State<HomePage> {
   /// DB再読み込みのみ
   /// =========================
   Future<void> reloadOnly() async {
-    articles = await analytics.latestArticles();
 
-    /// ❌ sessions削除（完全廃止）
-    /// session = await analytics.latestSession(); ←削除
+    final userData =
+    await DbService.instance.getUser();
+
+    debugPrint(userData.toString());
+
+    user = userData;
+
+    session =
+    await analytics.latestSession();
+
+    debugPrint(session.toString());
+    debugPrint(
+      (await analytics.dailyPvTrend())
+          .toString(),
+    );
+
+    final trend =
+    await analytics.dailyPvTrend();
+
+    pvSpots = List.generate(
+      trend.length,
+          (i) {
+
+        final item = trend[i];
+
+        final views =
+        (item['views'] ?? 0) as int;
+
+        return FlSpot(
+          i.toDouble(),
+          views.toDouble(),
+        );
+      },
+    );
+    debugPrint(pvSpots.toString());
+
+    articles =
+    await analytics.latestArticles();
 
     diffCache.clear();
     tagCache.clear();
@@ -79,8 +118,12 @@ class _HomePageState extends State<HomePage> {
       final id = a['article_id'].toString();
 
       try {
-        diffCache[id] = await analytics.dailyIncrease(id);
-        tagCache[id] = await analytics.tags(id);
+        diffCache[id] =
+        await analytics.dailyIncrease(id);
+
+        tagCache[id] =
+        await analytics.tags(id);
+
       } catch (e) {
         diffCache[id] = 0;
         tagCache[id] = [];
@@ -147,6 +190,169 @@ class _HomePageState extends State<HomePage> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
         children: [
+          if (user != null)
+            Card(
+              margin: const EdgeInsets.all(12),
+
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+
+                child: Row(
+                  children: [
+
+                    CircleAvatar(
+                      radius: 32,
+
+                      backgroundImage: NetworkImage(
+                        user!['profile_image_url']
+                            .toString(),
+                      ),
+                    ),
+
+                    const SizedBox(width: 16),
+
+                    Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
+
+                      children: [
+
+                        Text(
+                          user!['name'].toString(),
+
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 4),
+
+                        Text(
+                          '@${user!['id']}',
+
+                          style: const TextStyle(
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          if (session != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+              ),
+
+              child: Row(
+                children: [
+
+                  Expanded(
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+
+                        child: Column(
+                          children: [
+
+                            const Text(
+                              'PV',
+                              style: TextStyle(
+                                color: Colors.grey,
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Text(
+                              session!['total_views']
+                                  .toString(),
+
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight:
+                                FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  Expanded(
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+
+                        child: Column(
+                          children: [
+
+                            const Text(
+                              'LGTM',
+                              style: TextStyle(
+                                color: Colors.grey,
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Text(
+                              session!['total_likes']
+                                  .toString(),
+
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight:
+                                FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  Expanded(
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+
+                        child: Column(
+                          children: [
+
+                            const Text(
+                              'Stock',
+                              style: TextStyle(
+                                color: Colors.grey,
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Text(
+                              session!['total_stocks']
+                                  .toString(),
+
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight:
+                                FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           /// =========================
           /// articles
           /// =========================

@@ -28,6 +28,29 @@ class AnalyticsService {
 
     return result;
   }
+  /// =========================
+  /// KPIデータ取得
+  /// =========================
+
+  Future<Map<String, dynamic>?>
+  latestSession() async {
+
+    final db = await DbService.instance.database;
+
+    final result = await db.query(
+      'sync_sessions',
+
+      orderBy: 'timestamp DESC',
+
+      limit: 1,
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return result.first;
+  }
 
   /// =========================
   /// 最新スナップショット（sessions置換）
@@ -115,5 +138,79 @@ class AnalyticsService {
     debugPrint('filtered history count = ${result.length}');
 
     return result;
+  }
+  Future<List<Map<String, dynamic>>>
+  dailyPvTrend() async {
+
+    final db =
+    await DbService.instance.database;
+
+    final snapshots = await db.query(
+      'snapshots',
+      orderBy: 'timestamp ASC',
+    );
+
+    final latestMap =
+    <String, Map<String, dynamic>>{};
+
+    for (final s in snapshots) {
+
+      final ts =
+      s['timestamp']?.toString();
+
+      if (ts == null) {
+        continue;
+      }
+
+      final dt = DateTime.parse(ts);
+
+      final dateKey =
+          '${dt.year}'
+          '-${dt.month.toString().padLeft(2, '0')}'
+          '-${dt.day.toString().padLeft(2, '0')}';
+
+      final articleId =
+      s['article_id'].toString();
+
+      final key =
+          '$dateKey-$articleId';
+
+      latestMap[key] = s;
+    }
+
+    /// =========================
+    /// 日別合計
+    /// =========================
+
+    final dailyMap = <String, int>{};
+
+    for (final entry in latestMap.entries) {
+
+      final snapshot = entry.value;
+
+      final ts =
+      snapshot['timestamp'].toString();
+
+      final dt = DateTime.parse(ts);
+
+      final dateKey =
+          '${dt.year}'
+          '-${dt.month.toString().padLeft(2, '0')}'
+          '-${dt.day.toString().padLeft(2, '0')}';
+
+      final views =
+      (snapshot['views'] ?? 0) as int;
+
+      dailyMap[dateKey] =
+          (dailyMap[dateKey] ?? 0)
+              + views;
+    }
+
+    return dailyMap.entries.map((e) {
+      return {
+        'date': e.key,
+        'views': e.value,
+      };
+    }).toList();
   }
 }

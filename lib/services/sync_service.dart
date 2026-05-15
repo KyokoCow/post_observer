@@ -18,6 +18,21 @@ class SyncService {
     final now = DateTime.now().toIso8601String();
     final syncId = DateTime.now().millisecondsSinceEpoch;
 
+    await DbService.instance.saveUser({
+      'id': user['id'] ?? '',
+
+      'name':
+      (user['name'] ?? '').toString().isEmpty
+          ? user['id']
+          : user['name'],
+
+      'profile_image_url':
+      user['profile_image_url'] ?? '',
+
+      'created_at': now,
+      'updated_at': now,
+    });
+
     /// =========================
     /// 集計
     /// =========================
