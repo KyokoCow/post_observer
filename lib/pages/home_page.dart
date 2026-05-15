@@ -22,6 +22,8 @@ class _HomePageState extends State<HomePage> {
   final analytics = AnalyticsService();
 
   List<Map<String, dynamic>> articles = [];
+  List<Map<String, dynamic>>
+  rankingArticles = [];
 
   bool loading = false;
 
@@ -110,6 +112,21 @@ class _HomePageState extends State<HomePage> {
 
     articles =
     await analytics.latestArticles();
+
+    rankingArticles =
+    List<Map<String, dynamic>>
+        .from(articles);
+
+    rankingArticles.sort((a, b) {
+
+      final av =
+      (a['views'] ?? 0) as int;
+
+      final bv =
+      (b['views'] ?? 0) as int;
+
+      return bv.compareTo(av);
+    });
 
     diffCache.clear();
     tagCache.clear();
@@ -352,6 +369,127 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
+
+          if (pvSpots.isNotEmpty)
+            SizedBox(
+              height: 200,
+
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                ),
+
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+
+                    child: LineChart(
+                      LineChartData(
+
+                        gridData:
+                        const FlGridData(
+                          show: false,
+                        ),
+
+                        borderData:
+                        FlBorderData(
+                          show: false,
+                        ),
+
+                        titlesData:
+                        const FlTitlesData(
+                          show: false,
+                        ),
+
+                        lineBarsData: [
+
+                          LineChartBarData(
+                            spots: pvSpots,
+
+                            isCurved: true,
+
+                            barWidth: 3,
+
+                            dotData:
+                            const FlDotData(
+                              show: false,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          Card(
+            margin: const EdgeInsets.only(
+              left: 12,
+              right: 12,
+              top: 8,
+            ),
+
+            child: Column(
+              children: List.generate(
+
+                rankingArticles.take(5).length,
+
+                    (i) {
+
+                  final a =
+                  rankingArticles[i];
+
+                  return Column(
+                    children: [
+
+                      ListTile(
+
+                        leading: CircleAvatar(
+                          child: Text(
+                            '${i + 1}',
+                          ),
+                        ),
+
+                        title: Text(
+                          a['title']
+                              .toString(),
+                        ),
+
+                        subtitle: Text(
+                          'PV ${a['views']}',
+                        ),
+
+                        onTap: () {
+                          Navigator.push(
+                            context,
+
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  DetailPage(
+                                    articleId:
+                                    a['article_id']
+                                        .toString(),
+
+                                    title:
+                                    a['title']
+                                        .toString(),
+                                  ),
+                            ),
+                          );
+                        },
+                      ),
+
+                      if (i != 4)
+                        const Divider(
+                          height: 1,
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
 
           /// =========================
           /// articles
