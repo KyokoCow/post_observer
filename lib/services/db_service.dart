@@ -36,7 +36,7 @@ class DbService {
 
       path,
 
-      version: 11,
+      version: 12,
 
       onCreate: (
           db,
@@ -172,7 +172,9 @@ class DbService {
         total_likes INTEGER NOT NULL DEFAULT 0,
         total_stocks INTEGER NOT NULL DEFAULT 0,
 
-        followers INTEGER NOT NULL DEFAULT 0
+        followers INTEGER NOT NULL DEFAULT 0,
+        followees INTEGER NOT NULL DEFAULT 0,
+        items_count INTEGER NOT NULL DEFAULT 0
       )
     ''');
 

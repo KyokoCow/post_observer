@@ -56,11 +56,16 @@ class SyncService {
       {
         'sync_id': syncId,
         'timestamp': now,
+
         'total_articles': items.length,
         'total_views': totalViews,
         'total_likes': totalLikes,
         'total_stocks': totalStocks,
-        'followers': followers,
+
+        /// ★追加（ここ）
+        'followers': (user['followers_count'] ?? 0) as int,
+        'followees': (user['followees_count'] ?? 0) as int,
+        'items_count': (user['items_count'] ?? 0) as int,
       },
     );
 
