@@ -12,11 +12,19 @@ import '../services/sync_service.dart';
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
+
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
+
+  ///グラフ表示を無効化
+  static const bool showGraph = false;
+  ///ランキング表示を無効化
+  static const bool showRanking = false;
+
+
 
   final syncService = SyncService();
   final analytics = AnalyticsService();
@@ -33,6 +41,8 @@ class _HomePageState extends State<HomePage> {
   Map<String, dynamic>? user;
   Map<String, dynamic>? session;
   List<FlSpot> pvSpots = [];
+
+
 
   /// =========================
   /// refresh
@@ -180,7 +190,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Qiita Observer'),
+        title: const Text('Post Observer'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -210,46 +220,80 @@ class _HomePageState extends State<HomePage> {
           if (user != null)
             Card(
               margin: const EdgeInsets.all(12),
-
               child: Padding(
                 padding: const EdgeInsets.all(12),
-
                 child: Row(
                   children: [
 
                     CircleAvatar(
                       radius: 32,
-
                       backgroundImage: NetworkImage(
-                        user!['profile_image_url']
-                            .toString(),
+                        user!['profile_image_url'].toString(),
                       ),
                     ),
 
                     const SizedBox(width: 16),
 
-                    Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                    // 名前・ID（中央）
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
 
+                          Text(
+                            user!['name'].toString(),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          Text(
+                            '@${user!['id']}',
+                            style: const TextStyle(
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // 右側：フォロワー情報
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
 
                         Text(
-                          user!['name'].toString(),
-
+                          'Followers',
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+
+                        Text(
+                          '${session!['followers'] ?? 0}',
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
 
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 8),
 
                         Text(
-                          '@${user!['id']}',
-
+                          'Following',
                           style: const TextStyle(
+                            fontSize: 12,
                             color: Colors.grey,
+                          ),
+                        ),
+
+                        Text(
+                          '${session!['followees'] ?? 0}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
@@ -370,7 +414,9 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-          if (pvSpots.isNotEmpty)
+
+
+          if (showGraph && pvSpots.isNotEmpty)
             SizedBox(
               height: 200,
 
@@ -423,73 +469,74 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-          Card(
-            margin: const EdgeInsets.only(
-              left: 12,
-              right: 12,
-              top: 8,
-            ),
+          if (showRanking)
+            Card(
+              margin: const EdgeInsets.only(
+                left: 12,
+                right: 12,
+                top: 8,
+              ),
 
-            child: Column(
-              children: List.generate(
+              child: Column(
+                children: List.generate(
 
-                rankingArticles.take(5).length,
+                  rankingArticles.take(5).length,
 
-                    (i) {
+                      (i) {
 
-                  final a =
-                  rankingArticles[i];
+                    final a =
+                    rankingArticles[i];
 
-                  return Column(
-                    children: [
+                    return Column(
+                      children: [
 
-                      ListTile(
+                        ListTile(
 
-                        leading: CircleAvatar(
-                          child: Text(
-                            '${i + 1}',
-                          ),
-                        ),
-
-                        title: Text(
-                          a['title']
-                              .toString(),
-                        ),
-
-                        subtitle: Text(
-                          'PV ${a['views']}',
-                        ),
-
-                        onTap: () {
-                          Navigator.push(
-                            context,
-
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  DetailPage(
-                                    articleId:
-                                    a['article_id']
-                                        .toString(),
-
-                                    title:
-                                    a['title']
-                                        .toString(),
-                                  ),
+                          leading: CircleAvatar(
+                            child: Text(
+                              '${i + 1}',
                             ),
-                          );
-                        },
-                      ),
+                          ),
 
-                      if (i != 4)
-                        const Divider(
-                          height: 1,
+                          title: Text(
+                            a['title']
+                                .toString(),
+                          ),
+
+                          subtitle: Text(
+                            'PV ${a['views']}',
+                          ),
+
+                          onTap: () {
+                            Navigator.push(
+                              context,
+
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    DetailPage(
+                                      articleId:
+                                      a['article_id']
+                                          .toString(),
+
+                                      title:
+                                      a['title']
+                                          .toString(),
+                                    ),
+                              ),
+                            );
+                          },
                         ),
-                    ],
-                  );
-                },
+
+                        if (i != 4)
+                          const Divider(
+                            height: 1,
+                          ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
-          ),
 
           /// =========================
           /// articles
