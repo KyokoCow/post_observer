@@ -36,7 +36,7 @@ class DbService {
 
       path,
 
-      version: 10,
+      version: 11,
 
       onCreate: (
           db,
@@ -77,6 +77,10 @@ class DbService {
           'DROP TABLE IF EXISTS settings',
         );
 
+        await db.execute(
+          'DROP TABLE IF EXISTS users',
+        );
+
         await _createAll(db);
       },
     );
@@ -85,6 +89,22 @@ class DbService {
   Future<void> _createAll(
       Database db,
       ) async {
+    /// =========================
+    /// users
+    /// =========================
+
+    await db.execute('''
+      CREATE TABLE users(
+        id TEXT PRIMARY KEY,
+    
+        name TEXT NOT NULL,
+    
+        profile_image_url TEXT NOT NULL,
+    
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
 
     /// =========================
     /// snapshots
