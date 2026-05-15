@@ -355,6 +355,41 @@ class DbService {
     );
   }
 
+  Future<void> saveUser(
+      Map<String, dynamic> user,
+      ) async {
+
+    final db = await database;
+
+    await db.insert(
+      'users',
+      user,
+
+      conflictAlgorithm:
+      ConflictAlgorithm.replace,
+    );
+  }
+
+  /// =========================
+  /// user
+  /// =========================
+
+  Future<Map<String, dynamic>?>
+  getUser() async {
+
+    final db = await database;
+
+    final result = await db.query(
+      'users',
+      limit: 1,
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return result.first;
+  }
   /// =========================
   /// settings
   /// =========================
