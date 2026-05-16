@@ -21,9 +21,14 @@ class QiitaService {
       Uri.parse(
         'https://qiita.com/api/v2/authenticated_user/items?page=1&per_page=100',
       ),
+
       headers: {
         'Authorization': 'Bearer $token',
+
+        'Connection': 'close',
       },
+    ).timeout(
+      const Duration(seconds: 15),
     );
 
     if (response.statusCode != 200) {
@@ -55,9 +60,14 @@ class QiitaService {
       Uri.parse(
         'https://qiita.com/api/v2/authenticated_user',
       ),
+
       headers: {
         'Authorization': 'Bearer $token',
+
+        'Connection': 'close',
       },
+    ).timeout(
+      const Duration(seconds: 15),
     );
 
     if (response.statusCode != 200) {
